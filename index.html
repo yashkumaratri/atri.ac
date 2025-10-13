@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>atri.ac • Sample Site</title>
+  <meta name="description" content="Sample site on atri.ac powered by GitHub Pages" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🅐</text></svg>">
+  <!-- Tailwind via CDN for quick styling -->
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-slate-50 text-slate-800">
+  <header class="border-b bg-white/80 backdrop-blur">
+    <div class="mx-auto max-w-5xl px-6 py-4 flex items-center justify-between">
+      <a href="/" class="text-xl font-bold">atri.ac</a>
+      <nav class="space-x-6 text-sm">
+        <a href="#about" class="hover:underline">About</a>
+        <a href="#projects" class="hover:underline">Projects</a>
+        <a href="#contact" class="hover:underline">Contact</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="mx-auto max-w-5xl px-6 py-12">
+    <section class="mb-14">
+      <h1 class="text-4xl font-extrabold tracking-tight">Hello from atri.ac</h1>
+      <p class="mt-4 text-lg text-slate-600">
+        This site is served from the GitHub repository <code>yashkumaratri/atri.ac</code>.
+        Edit <code>index.html</code> to update content. Add more pages as needed.
+      </p>
+      <div class="mt-8 flex gap-4">
+        <a href="#projects" class="rounded-2xl border px-4 py-2">View Projects</a>
+        <a href="https://github.com/yashkumaratri/atri.ac" class="rounded-2xl bg-black text-white px-4 py-2">Repo</a>
+      </div>
+    </section>
+
+    <section id="about" class="mb-14">
+      <h2 class="text-2xl font-semibold">About</h2>
+      <p class="mt-3 text-slate-700">
+        Replace this with your lab or portfolio. You can include Markdown-like sections,
+        or switch to a static site generator later.
+      </p>
+    </section>
+
+    <section id="projects" class="mb-14">
+      <h2 class="text-2xl font-semibold">Projects</h2>
+      <ul class="mt-4 grid gap-4 md:grid-cols-2">
+        <li class="rounded-2xl border bg-white p-5">
+          <h3 class="font-semibold">Project One</h3>
+          <p class="text-slate-600 mt-2">Short description goes here.</p>
+        </li>
+        <li class="rounded-2xl border bg-white p-5">
+          <h3 class="font-semibold">Project Two</h3>
+          <p class="text-slate-600 mt-2">Short description goes here.</p>
+        </li>
+      </ul>
+    </section>
+
+    <section id="contact" class="mb-14">
+      <h2 class="text-2xl font-semibold">Contact</h2>
+      <p class="mt-3">Email: <a class="underline" href="mailto:you@atri.ac">you@atri.ac</a></p>
+    </section>
+  </main>
+
+  <footer class="border-t">
+    <div class="mx-auto max-w-5xl px-6 py-8 text-sm text-slate-500">
+      © <span id="year"></span> atri.ac
+    </div>
+  </footer>
+
+  <script>
+    document.getElementById('year').textContent = new Date().getFullYear();
+  </script>
+</body>
+</html>
