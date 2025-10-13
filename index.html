@@ -3,40 +3,95 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>atri.ac • flowfield</title>
+<title>atri.ac • ambient</title>
 <style>
   html,body{margin:0;height:100%;background:#050510;overflow:hidden}
   canvas{display:block;width:100%;height:100%}
-  .hud{
-    position:fixed;left:12px;bottom:12px;color:#dbeafe;font-family:system-ui,Inter,Arial,sans-serif;
-    font-size:12px;line-height:1.35;background:rgba(5,5,20,.35);backdrop-filter:blur(6px);
-    border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:10px 12px;user-select:none
-  }
-  .hud b{color:#a5f3fc}
-  .pulse{animation:pulse 1.8s ease-in-out infinite}
-  @keyframes pulse{0%{opacity:.55}50%{opacity:1}100%{opacity:.55}}
+  .ui{position:fixed;left:12px;bottom:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;
+      color:#dbeafe;font:12px/1.35 system-ui,Inter,Arial,sans-serif;background:rgba(5,5,20,.35);
+      backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:8px 10px;user-select:none;z-index:10}
+  .ui *{accent-color:#67e8f9}
+  .btn,.sel,.rng{border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.06);color:#dbeafe;
+      border-radius:999px;padding:4px 10px;font:12px system-ui;cursor:pointer}
+  .sel{padding:3px 8px}
+  .rng{height:24px;border-radius:12px}
+  .hint{opacity:.8}
+  .badge{padding:2px 8px;border-radius:999px;background:rgba(103,232,249,.15);border:1px solid rgba(103,232,249,.35)}
+  .chk{display:flex;gap:6px;align-items:center;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.06);
+       padding:4px 8px;border-radius:999px}
+  .hide{display:none}
+  .top{position:fixed;top:12px;left:12px;color:#c7d2fe;font:12px system-ui;background:rgba(5,5,20,.35);
+      border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:6px 8px;z-index:10}
 </style>
 </head>
 <body>
 <canvas id="fx"></canvas>
-<div class="hud">
-  <div><b>atri.ac</b> flowfield</div>
-  <div class="pulse">click or press <b>C</b> to change colors</div>
-  <div>press <b>Space</b> to burst • press <b>H</b> to hide UI</div>
-  <div>drag to attract • <b>1-5</b> quality • <b>R</b> reset</div>
+<!-- offscreen for bloom pass -->
+<canvas id="low" class="hide"></canvas>
+
+<div class="top" id="help">
+  Click changes palette • Space burst • C colors • S snapshot • F fullscreen • P pause • M mic • 1 to 8 quality • B bloom
+</div>
+
+<div class="ui" id="ui">
+  <span class="badge">atri.ac</span>
+  <select id="scene" class="sel" title="Scene">
+    <option value="flow">Flowfield</option>
+    <option value="orbs">Orbs</option>
+    <option value="ribbons">Ribbons</option>
+  </select>
+  <select id="palette" class="sel" title="Palette"></select>
+  <label class="hint">Q<input id="quality" class="rng" type="range" min="1" max="8" value="4"></label>
+  <label class="hint">FPS<input id="fps" class="rng" type="range" min="24" max="120" value="60"></label>
+  <label class="chk"><input id="bloom" type="checkbox"> Bloom</label>
+  <label class="chk"><input id="auto" type="checkbox"> Auto cycle</label>
+  <button id="micBtn" class="btn" title="Audio reactive">Mic Off</button>
+  <button id="pauseBtn" class="btn">Pause</button>
+  <button id="shotBtn" class="btn">Snapshot</button>
+  <button id="fsBtn" class="btn">Fullscreen</button>
+  <button id="hideBtn" class="btn">Hide UI</button>
 </div>
 
 <script>
-/* ========= Simplex Noise (2D) =========
-   Adapted from Stefan Gustavson public domain reference */
+/* ========= Utilities ========= */
+const DPR=Math.min(devicePixelRatio||1,2);
+const canvas=document.getElementById('fx');
+const ctx=canvas.getContext('2d',{alpha:false});
+const low=document.getElementById('low');
+const lctx=low.getContext('2d',{alpha:true});
+let W=0,H=0, running=true, lastFrame=0, targetFPS=60, frameCap=1000/60;
+function resize(){
+  W=canvas.width=Math.floor(innerWidth*DPR);
+  H=canvas.height=Math.floor(innerHeight*DPR);
+  canvas.style.width=innerWidth+'px'; canvas.style.height=innerHeight+'px';
+  low.width=Math.max(1,Math.floor(W*0.3)); low.height=Math.max(1,Math.floor(H*0.3));
+}
+addEventListener('resize',resize); resize();
+const $=s=>document.querySelector(s);
+
+/* ========= Palettes ========= */
+const PALETTES=[
+  {name:'Aurora', fn:t=>`hsla(${120+80*Math.sin(t)},90%,70%,0.75)`},
+  {name:'Neon Ocean', fn:t=>`hsla(${180+30*Math.sin(t*1.2)},100%,60%,0.82)`},
+  {name:'Sunrise', fn:t=>`hsla(${20+40*Math.sin(t)},92%,66%,0.78)`},
+  {name:'Candy', fn:t=>`hsla(${300+120*Math.sin(t*0.9)},95%,72%,0.78)`},
+  {name:'Cyan Violet', fn:t=>`hsla(${200+60*Math.sin(t)},100%,70%,0.78)`},
+  {name:'Lime Punch', fn:t=>`hsla(${90+60*Math.cos(t*1.4)},100%,62%,0.82)`},
+  {name:'Magma', fn:t=>`hsla(${10+10*Math.sin(t*0.7)},90%,60%,0.84)`},
+  {name:'Glacier', fn:t=>`hsla(${200+20*Math.cos(t)},95%,80%,0.82)`}
+];
+const paletteSel=$('#palette'); PALETTES.forEach((p,i)=>{ const o=document.createElement('option'); o.value=i; o.textContent=p.name; paletteSel.appendChild(o); });
+
+let paletteIndex= +localStorage.getItem('palIdx') || 0;
+paletteSel.value=paletteIndex;
+
+/* ========= Simplex Noise 2D ========= */
 const Simplex2D=(function(){
   const grad3=new Float32Array([1,1,-1,1,1,-1,-1,-1,1,0,-1,0,1,0,-1,0,0,1,0,-1,0,1,0,-1]);
   const p=new Uint8Array(256); for(let i=0;i<256;i++) p[i]=i;
-  function seed(s){
-    let n=s>>>0; for(let i=255;i>0;i--){n=(n*1664525+1013904223)>>>0; const r=n%(i+1); const t=p[i]; p[i]=p[r]; p[r]=t;}
-    perm.set(p); permMod12.set(p.map(v=>v%12));
-  }
-  const perm=new Uint8Array(512), permMod12=new Uint8Array(512); seed(1337);
+  function seed(s){ let n=s>>>0; for(let i=255;i>0;i--){ n=(n*1664525+1013904223)>>>0; const r=n%(i+1); const t=p[i]; p[i]=p[r]; p[r]=t; }
+    perm.set(p); permMod12.set(p.map(v=>v%12)); }
+  const perm=new Uint8Array(512), permMod12=new Uint8Array(512); seed( Date.now()^0x9e3779b9 );
   function noise(xin,yin){
     const F2=0.5*(Math.sqrt(3)-1), s=(xin+yin)*F2, i=Math.floor(xin+s), j=Math.floor(yin+s);
     const G2=(3-Math.sqrt(3))/6, t=(i+j)*G2, X0=i-t, Y0=j-t, x0=xin-X0, y0=yin-Y0;
@@ -52,162 +107,285 @@ const Simplex2D=(function(){
   noise.seed=seed; return noise;
 })();
 
-/* ========= Flow Field ========= */
-const canvas=document.getElementById('fx');
-const ctx=canvas.getContext('2d');
-let DPR=Math.min(devicePixelRatio||1,2);
-let W,H,particles=[],fieldScale=0.0017, time=0, zInc=0.0012;
-let mouse={x:0,y:0,down:false};
-let quality=4; // 1..5
-const palettes=[
-  // cyan violet emerald
-  t=>`hsla(${200+60*Math.sin(t)},100%,70%,.7)`,
-  // sunrise
-  t=>`hsla(${20+40*Math.sin(t)},90%,65%,.7)`,
-  // aurora
-  t=>`hsla(${120+80*Math.sin(t*0.8)},80%,70%,.75)`,
-  // neon ocean
-  t=>`hsla(${180+30*Math.sin(t*1.2)},100%,60%,.8)`,
-  // candy
-  t=>`hsla(${300+120*Math.sin(t*0.9)},95%,70%,.75)`
-];
-let paletteIndex=0;
+/* ========= Interaction and Audio ========= */
+const mouse={x:W*0.5, y:H*0.5, down:false};
+addEventListener('mousemove',e=>{mouse.x=e.clientX*DPR; mouse.y=e.clientY*DPR;});
+addEventListener('mousedown',()=>{mouse.down=true; nextPalette(); burst(1200);});
+addEventListener('mouseup',()=>{mouse.down=false;});
+addEventListener('touchstart',e=>{mouse.down=true; const t=e.touches[0]; mouse.x=t.clientX*DPR; mouse.y=t.clientY*DPR; nextPalette(); burst(1200);},{passive:true});
+addEventListener('touchmove',e=>{const t=e.touches[0]; if(t){ mouse.x=t.clientX*DPR; mouse.y=t.clientY*DPR; }},{passive:true});
+addEventListener('touchend',()=>{mouse.down=false;});
 
-function resize(){
-  DPR=Math.min(devicePixelRatio||1,2);
-  W=canvas.width=Math.floor(innerWidth*DPR);
-  H=canvas.height=Math.floor(innerHeight*DPR);
-  canvas.style.width=innerWidth+'px';
-  canvas.style.height=innerHeight+'px';
-  resetParticles();
+let audioCtx=null, analyser=null, freqBuf=null, micOn=false;
+async function toggleMic(){
+  if(micOn){ micOn=false; $('#micBtn').textContent='Mic Off'; return; }
+  try{
+    audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)();
+    const stream = await navigator.mediaDevices.getUserMedia({audio:true});
+    const src = audioCtx.createMediaStreamSource(stream);
+    analyser = audioCtx.createAnalyser(); analyser.fftSize=1024; analyser.smoothingTimeConstant=0.85;
+    src.connect(analyser); freqBuf = new Uint8Array(analyser.frequencyBinCount);
+    micOn=true; $('#micBtn').textContent='Mic On';
+  }catch(e){ alert('Microphone permission denied'); }
 }
-window.addEventListener('resize',resize); resize();
+$('#micBtn').onclick=toggleMic;
 
-function resetParticles(){
-  const count=Math.floor((W*H)/(1400/(quality*quality))); // scales with quality and screen
+/* ========= Settings ========= */
+let time=0, zInc=0.0012, quality = +localStorage.getItem('qual') || 4;
+$('#quality').value=quality; $('#quality').oninput=e=>{ quality=+e.target.value; saveSettings(); rebuildAll(); };
+
+$('#fps').oninput=e=>{ targetFPS=+e.target.value; frameCap=1000/targetFPS; };
+$('#fps').value= +localStorage.getItem('fps') || 60; targetFPS=$('#fps').value; frameCap=1000/targetFPS;
+
+const sceneSel=$('#scene'); sceneSel.value = localStorage.getItem('scene') || 'flow';
+sceneSel.onchange=()=>{ saveSettings(); rebuildAll(); };
+
+const bloomChk=$('#bloom'); bloomChk.checked = localStorage.getItem('bloom')==='1';
+bloomChk.onchange=()=>{ saveSettings(); };
+
+const autoChk=$('#auto'); autoChk.checked = localStorage.getItem('auto')==='1';
+autoChk.onchange=()=>{ saveSettings(); };
+
+$('#hideBtn').onclick=()=>{ $('#ui').classList.add('hide'); $('#help').classList.add('hide'); };
+$('#fsBtn').onclick=()=>{ if(!document.fullscreenElement){ document.documentElement.requestFullscreen(); } else { document.exitFullscreen(); } };
+$('#shotBtn').onclick=snapshot;
+$('#pauseBtn').onclick=()=>{ running=!running; $('#pauseBtn').textContent=running?'Pause':'Play'; if(running) loop(performance.now()); };
+
+addEventListener('keydown',e=>{
+  if(e.code==='Space'){ e.preventDefault(); burst(); }
+  if(e.key==='c'||e.key==='C'){ nextPalette(); }
+  if(e.key==='p'||e.key==='P'){ $('#pauseBtn').click(); }
+  if(e.key==='m'||e.key==='M'){ $('#micBtn').click(); }
+  if(/[1-8]/.test(e.key)){ quality=+e.key; $('#quality').value=quality; saveSettings(); rebuildAll(); }
+  if(e.key==='f'||e.key==='F'){ $('#fsBtn').click(); }
+  if(e.key==='s'||e.key==='S'){ snapshot(); }
+  if(e.key==='b'||e.key==='B'){ bloomChk.checked=!bloomChk.checked; saveSettings(); }
+});
+
+paletteSel.onchange=e=>{ paletteIndex=+e.target.value; saveSettings(); };
+let autoTimer=0;
+function nextPalette(){ paletteIndex=(paletteIndex+1)%PALETTES.length; paletteSel.value=paletteIndex; saveSettings(); }
+function saveSettings(){
+  localStorage.setItem('palIdx',paletteIndex);
+  localStorage.setItem('qual',quality);
+  localStorage.setItem('scene',sceneSel.value);
+  localStorage.setItem('bloom', bloomChk.checked ? '1':'0');
+  localStorage.setItem('auto', autoChk.checked ? '1':'0');
+  localStorage.setItem('fps', $('#fps').value);
+}
+
+/* ========= Scenes data ========= */
+let particles=[], orbs=[], ribbons=[];
+function rebuildAll(){ buildFlow(); buildOrbs(); buildRibbons(); ctx.fillStyle='rgb(5,5,16)'; ctx.fillRect(0,0,W,H); }
+rebuildAll();
+
+/* Flowfield */
+let fieldScale=0.0016;
+function buildFlow(){
   particles.length=0;
-  for(let i=0;i<count;i++){
-    particles.push({
-      x:Math.random()*W, y:Math.random()*H,
-      vx:0, vy:0,
-      life: 200+Math.random()*600,
-      hueSeed:Math.random()*Math.PI*2
-    });
-  }
-  ctx.clearRect(0,0,W,H);
-  // prefill a faint background
-  ctx.fillStyle='rgba(5,5,16,1)'; ctx.fillRect(0,0,W,H);
+  const count=Math.floor((W*H)/(1200/(quality*quality)));
+  for(let i=0;i<count;i++) particles.push({x:Math.random()*W,y:Math.random()*H,vx:0,vy:0,life:200+Math.random()*600,seed:Math.random()*6.28});
 }
-
-/* Vector field from layered simplex noise */
 function field(x,y,t){
-  const n1=Simplex2D(x*fieldScale,y*fieldScale + t*0.35);
-  const n2=Simplex2D((x+1000)*fieldScale*0.6,(y-1000)*fieldScale*0.6 + t*0.22);
-  const a=(n1*1.2 + n2*0.8) * Math.PI; // angle
-  const m=0.6+0.4*Math.sin(n1*2.0 + t*0.5); // magnitude
+  const n1=Simplex2D(x*fieldScale, y*fieldScale + t*0.35);
+  const n2=Simplex2D((x+1000)*fieldScale*0.6, (y-1000)*fieldScale*0.6 + t*0.22);
+  const a=(n1*1.15+n2*0.85)*Math.PI;
+  const m=0.6+0.4*Math.sin(n1*2.0 + t*0.5);
   return {ax:Math.cos(a)*m, ay:Math.sin(a)*m};
 }
-
-/* Interaction: soft attractor around mouse when held */
 function attract(p){
-  const dx=(mouse.x - p.x), dy=(mouse.y - p.y);
-  const d2=dx*dx+dy*dy; if(d2<1) return;
-  const f= Math.min(1/(d2*0.000002), 0.2);
-  p.vx += dx*f; p.vy += dy*f;
+  const dx=mouse.x-p.x, dy=mouse.y-p.y, d2=dx*dx+dy*dy; if(d2<1) return;
+  const k = Math.min(1/(d2*0.000002), 0.22); p.vx += dx*k; p.vy += dy*k;
 }
 
-/* Draw trail as line segments with additive glow */
-function step(){
-  requestAnimationFrame(step);
-  time += zInc;
+/* Orbs */
+function buildOrbs(){
+  orbs.length=0;
+  const n = 24 + quality*6;
+  for(let i=0;i<n;i++){
+    orbs.push({x:Math.random()*W, y:Math.random()*H, r: 10+Math.random()*40*DPR, t:Math.random()*6.28, sp:0.003+Math.random()*0.004});
+  }
+}
 
-  // slow background fade to create trails
-  ctx.globalCompositeOperation='source-over';
-  ctx.fillStyle='rgba(5,5,18,0.06)'; // low alpha to keep long trails
-  ctx.fillRect(0,0,W,H);
-
-  ctx.globalCompositeOperation='lighter';
-  const colorFn=palettes[paletteIndex%palettes.length];
-
-  for(let i=0;i<particles.length;i++){
-    const p=particles[i];
-    // field acceleration
-    const v=field(p.x,p.y,time);
-    p.vx += v.ax*0.35;
-    p.vy += v.ay*0.35;
-
-    // mouse attractor
-    if(mouse.down) attract(p);
-
-    // mild viscosity
-    p.vx*=0.965; p.vy*=0.965;
-
-    const nx=p.x+p.vx, ny=p.y+p.vy;
-
-    // wrap edges
-    if(nx<0||nx>W||ny<0||ny>H){ p.x=Math.random()*W; p.y=Math.random()*H; p.vx=p.vy=0; p.life=200+Math.random()*600; continue; }
-
-    // color varies by particle phase and global time
-    const t = p.hueSeed + time*1.6;
-    ctx.strokeStyle=colorFn(Math.sin(t));
-    ctx.lineWidth= DPR * (0.6 + 0.6*Math.sin(t*2.0));
-    ctx.beginPath(); ctx.moveTo(p.x,p.y); ctx.lineTo(nx,ny); ctx.stroke();
-
-    p.x=nx; p.y=ny;
-    if(--p.life<=0){ // respawn softly
-      p.x=Math.random()*W; p.y=Math.random()*H; p.vx=p.vy=0; p.life=200+Math.random()*600;
+/* Ribbons */
+function buildRibbons(){
+  ribbons.length=0;
+  const bands = 6 + quality; // number of ribbons
+  for(let i=0;i<bands;i++){
+    const pts=[];
+    const len= 32 + quality*6;
+    const ox=Math.random()*W, oy=Math.random()*H, ang=Math.random()*Math.PI*2;
+    for(let j=0;j<len;j++){
+      pts.push({x:ox+Math.cos(ang)*j*8*DPR, y:oy+Math.sin(ang)*j*8*DPR, vx:0, vy:0});
+    }
+    ribbons.push({pts, w: 8*DPR + Math.random()*10*DPR, seed: Math.random()*6.28, life: 1});
+  }
+}
+function evolveRibbon(rb, t, energy){
+  const sp = 0.6 + energy*1.4;
+  for(let i=0;i<rb.pts.length;i++){
+    const p=rb.pts[i];
+    const n = Simplex2D(p.x*0.0012 + t*0.4, p.y*0.0012 - t*0.3);
+    p.vx = Math.cos(n*3.1415)*sp; p.vy = Math.sin(n*3.1415)*sp;
+    if(mouse.down){
+      const dx=mouse.x-p.x, dy=mouse.y-p.y, d2=dx*dx+dy*dy;
+      const k=Math.min(1/(d2*0.000003), 0.25);
+      p.vx += dx*k; p.vy += dy*k;
+    }
+  }
+  // integrate and smooth along the band
+  for(let i=0;i<rb.pts.length;i++){
+    const p=rb.pts[i];
+    p.x+=p.vx; p.y+=p.vy;
+    if(p.x< -50||p.x>W+50||p.y< -50||p.y>H+50){ p.x=Math.random()*W; p.y=Math.random()*H; }
+    if(i>0){
+      const prev=rb.pts[i-1];
+      p.x = 0.7*p.x + 0.3*(prev.x + (p.vx)); // cohesion
+      p.y = 0.7*p.y + 0.3*(prev.y + (p.vy));
     }
   }
 }
-step();
 
-/* Mouse */
-function setMouse(e){
-  const rect=canvas.getBoundingClientRect();
-  mouse.x=(e.clientX-rect.left)*DPR;
-  mouse.y=(e.clientY-rect.top)*DPR;
+/* Snapshot */
+function snapshot(){
+  const a=document.createElement('a');
+  a.href=canvas.toDataURL('image/png'); a.download='atriac_'+Date.now()+'.png'; a.click();
 }
-window.addEventListener('mousemove',setMouse);
-window.addEventListener('touchmove',e=>{if(e.touches[0]) setMouse(e.touches[0]);},{passive:true});
-window.addEventListener('mousedown',e=>{mouse.down=true; setMouse(e); paletteIndex++; burst(1200);});
-window.addEventListener('mouseup',()=>{mouse.down=false;});
-window.addEventListener('touchstart',e=>{mouse.down=true; if(e.touches[0]) setMouse(e.touches[0]); paletteIndex++; burst(1200);},{passive:true});
-window.addEventListener('touchend',()=>{mouse.down=false;});
 
-/* Burst: quick outward kick for a wave effect */
+/* Burst */
 function burst(ms=900){
   for(const p of particles){
-    const dx=p.x - mouse.x, dy=p.y - mouse.y;
-    const d=Math.hypot(dx,dy)+0.0001;
-    const power = 7/(1+d*0.01);
-    p.vx += (dx/d)*power;
-    p.vy += (dy/d)*power;
+    const dx=p.x-mouse.x, dy=p.y-mouse.y, d=Math.hypot(dx,dy)+0.0001;
+    const pow=7/(1+d*0.01); p.vx += (dx/d)*pow; p.vy += (dy/d)*pow;
   }
-  // momentary faster z to morph the field
-  const base=zInc; zInc=base*3;
-  setTimeout(()=> zInc=base, ms);
+  for(const rb of ribbons){ for(const p of rb.pts){
+    const dx=p.x-mouse.x, dy=p.y-mouse.y, d=Math.hypot(dx,dy)+0.0001;
+    const pow=9/(1+d*0.01); p.vx += (dx/d)*pow; p.vy += (dy/d)*pow;
+  }}
+  const base=zInc; zInc=base*3; setTimeout(()=>zInc=base, ms);
 }
 
-/* Keys */
-window.addEventListener('keydown',e=>{
-  if(e.code==='Space'){ e.preventDefault(); burst(); }
-  if(e.key==='c' || e.key==='C'){ paletteIndex++; }
-  if(e.key==='h' || e.key==='H'){ document.querySelector('.hud').style.display =
-      (document.querySelector('.hud').style.display==='none') ? 'block' : 'none'; }
-  if(e.key==='r' || e.key==='R'){ resetParticles(); }
-  if(/[1-5]/.test(e.key)){ quality=parseInt(e.key,10); resetParticles(); }
-});
+/* Loop */
+let bgHue=210, hueTick=0;
+function loop(t){
+  if(!running) return;
+  requestAnimationFrame(loop);
+  if(t - lastFrame < frameCap) return;
+  lastFrame = t;
 
-/* Nice background hue drift */
-let hueBase=210, hueTimer=0;
-setInterval(()=>{ hueBase=(hueBase+0.3)%360;
-  document.body.style.background=`hsl(${hueBase},40%,6%)`;
-  // small palette auto shift every 10 seconds
-  if((++hueTimer)%600===0) paletteIndex++;
-},50);
+  bgHue=(bgHue+0.25)%360; document.body.style.background=`hsl(${bgHue},40%,6%)`;
+  if(autoChk.checked && ++hueTick%900===0) { nextPalette(); if(hueTick%1800===0){ // swap scene sometimes
+      const idx = ['flow','orbs','ribbons']; const cur = sceneSel.value;
+      const next = idx[(idx.indexOf(cur)+1)%idx.length]; sceneSel.value=next; saveSettings(); rebuildAll();
+  }}
 
-/* Seed noise with time so each load is unique yet smooth */
-Simplex2D.seed((Date.now()&0xffffffff) ^ 0x9e3779b9);
+  // audio energy
+  let energy=0;
+  if(micOn && analyser){ analyser.getByteFrequencyData(freqBuf);
+    for(let i=0;i<freqBuf.length;i++) energy += freqBuf[i];
+    energy /= (freqBuf.length*255);
+  }
+
+  const colorFn=PALETTES[paletteIndex].fn;
+  time += zInc + (energy||0)*0.01;
+
+  if(sceneSel.value==='flow'){
+    // trail fade
+    ctx.globalCompositeOperation='source-over';
+    const fade = 0.05 + (energy||0)*0.10;
+    ctx.fillStyle=`rgba(5,5,18,${fade})`; ctx.fillRect(0,0,W,H);
+
+    ctx.globalCompositeOperation='lighter';
+    for(let i=0;i<particles.length;i++){
+      const p=particles[i], v=field(p.x,p.y,time);
+      p.vx += v.ax*0.35; p.vy += v.ay*0.35;
+      if(mouse.down) attract(p);
+      p.vx*=0.965; p.vy*=0.965;
+
+      const nx=p.x+p.vx, ny=p.y+p.vy;
+      if(nx<0||nx>W||ny<0||ny>H){ p.x=Math.random()*W; p.y=Math.random()*H; p.vx=p.vy=0; p.life=200+Math.random()*600; continue; }
+
+      const tt = p.seed + time*1.6 + (energy||0)*3.0;
+      ctx.strokeStyle=colorFn(Math.sin(tt));
+      ctx.lineWidth= DPR * (0.55 + 0.75*Math.sin(tt*2.0));
+      ctx.beginPath(); ctx.moveTo(p.x,p.y); ctx.lineTo(nx,ny); ctx.stroke();
+
+      p.x=nx; p.y=ny; if(--p.life<=0){ p.x=Math.random()*W; p.y=Math.random()*H; p.vx=p.vy=0; p.life=200+Math.random()*600; }
+    }
+  } else if(sceneSel.value==='orbs'){
+    ctx.globalCompositeOperation='source-over';
+    const fade = 0.10; ctx.fillStyle=`rgba(5,5,18,${fade})`; ctx.fillRect(0,0,W,H);
+    ctx.globalCompositeOperation='lighter';
+
+    for(const o of orbs){
+      o.t += o.sp + (energy||0)*0.01;
+      const n = Simplex2D((o.x*0.0015)+(time*0.5), (o.y*0.0015)-(time*0.5));
+      o.x += Math.cos(o.t+n)*1.6*DPR; o.y += Math.sin(o.t-n)*1.6*DPR;
+
+      const dx=mouse.x-o.x, dy=mouse.y-o.y, d=Math.hypot(dx,dy);
+      if(mouse.down && d<200*DPR){ o.x -= dx*0.02; o.y -= dy*0.02; }
+
+      if(o.x< -50||o.x>W+50||o.y< -50||o.y>H+50){ o.x=Math.random()*W; o.y=Math.random()*H; }
+
+      const tt = o.t + time;
+      const r = o.r * (0.8 + 0.4*Math.sin(tt*2.0 + n));
+      const grad = ctx.createRadialGradient(o.x,o.y,0,o.x,o.y,r);
+      const col = colorFn(Math.sin(tt));
+      grad.addColorStop(0, col.replace(/0\.\d+\)/,'1)'));
+      grad.addColorStop(1, col);
+
+      ctx.fillStyle=grad;
+      ctx.beginPath(); ctx.arc(o.x,o.y,r,0,Math.PI*2); ctx.fill();
+    }
+  } else {
+    // ribbons
+    ctx.globalCompositeOperation='source-over';
+    const fade = 0.07 + (energy||0)*0.06;
+    ctx.fillStyle=`rgba(5,5,18,${fade})`; ctx.fillRect(0,0,W,H);
+
+    ctx.globalCompositeOperation='lighter';
+    for(const rb of ribbons){
+      evolveRibbon(rb, time, energy||0);
+      // draw strip
+      const w = rb.w*(0.9 + 0.3*Math.sin(time*1.3 + rb.seed));
+      ctx.lineJoin='round'; ctx.lineCap='round';
+      for(let i=1;i<rb.pts.length;i++){
+        const a=rb.pts[i-1], b=rb.pts[i];
+        const t = (i/rb.pts.length) + time*0.1 + rb.seed;
+        ctx.strokeStyle = colorFn(Math.sin(t*2.0));
+        ctx.lineWidth = w*(0.6 + 0.4*Math.sin(t*3.0));
+        ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
+      }
+    }
+  }
+
+  // bloom pass
+  if(bloomChk.checked){
+    // downsample
+    lctx.clearRect(0,0,low.width,low.height);
+    lctx.globalCompositeOperation='source-over';
+    lctx.filter='blur(6px) saturate(130%) brightness(120%)';
+    lctx.drawImage(canvas,0,0,low.width,low.height);
+    // upsample additively
+    ctx.globalCompositeOperation='lighter';
+    ctx.globalAlpha=0.6;
+    ctx.drawImage(low,0,0,W,H);
+    ctx.globalAlpha=1;
+    ctx.globalCompositeOperation='source-over';
+  }
+}
+requestAnimationFrame(loop);
+
+/* UI actions */
+function snapshot(){
+  const a=document.createElement('a');
+  a.href=canvas.toDataURL('image/png'); a.download='atriac_'+Date.now()+'.png'; a.click();
+}
+
+/* Init */
+paletteIndex = +localStorage.getItem('palIdx') || paletteIndex;
+paletteSel.value=paletteIndex;
+document.body.style.background=`hsl(210,40%,6%)`;
 </script>
 </body>
 </html>
