@@ -3,72 +3,350 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>atri.ac • Sample Site</title>
-  <meta name="description" content="Sample site on atri.ac powered by GitHub Pages" />
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🅐</text></svg>">
-  <!-- Tailwind via CDN for quick styling -->
+  <title>Atri.ac — Now Thinking</title>
+  <meta name="description" content="A living visual mind space by Yash Kumar Atri" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'ui-sans-serif', 'system-ui'],
+            mono: ['JetBrains Mono', 'ui-monospace', 'SFMono-Regular']
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* Smooth fade for sections */
+    .reveal { opacity: 0; transform: translateY(12px); transition: all .7s ease; }
+    .reveal.show { opacity: 1; transform: translateY(0); }
+
+    /* Neon glow */
+    .neon { text-shadow: 0 0 12px rgba(99,102,241,.5), 0 0 30px rgba(56,189,248,.35); }
+
+    /* Glass card backdrop */
+    .glass { background: rgba(255,255,255,.08); backdrop-filter: blur(10px); }
+
+    /* Cursor ring */
+    .cursor-ring { pointer-events: none; position: fixed; left: 0; top: 0; width: 24px; height: 24px; border: 2px solid rgba(255,255,255,.55); border-radius: 9999px; transform: translate(-50%,-50%); transition: transform .08s ease; z-index: 90; }
+
+    /* Hide scrollbar but keep scroll */
+    ::-webkit-scrollbar { width: 0; height: 0; }
+    html { scroll-behavior: smooth; }
+  </style>
 </head>
-<body class="min-h-screen bg-slate-50 text-slate-800">
-  <header class="border-b bg-white/80 backdrop-blur">
-    <div class="mx-auto max-w-5xl px-6 py-4 flex items-center justify-between">
-      <a href="/" class="text-xl font-bold">atri.ac</a>
-      <nav class="space-x-6 text-sm">
-        <a href="#about" class="hover:underline">About</a>
-        <a href="#projects" class="hover:underline">Projects</a>
-        <a href="#contact" class="hover:underline">Contact</a>
-      </nav>
+<body class="bg-slate-950 text-slate-100 overflow-x-hidden">
+
+  <!-- Animated gradient backdrop -->
+  <div class="fixed inset-0 -z-20">
+    <div class="absolute -inset-[40%] blur-3xl opacity-40 animate-pulse"
+         style="background: radial-gradient(60% 60% at 50% 40%, #22d3ee 0%, transparent 60%),
+                 radial-gradient(40% 40% at 30% 70%, #a78bfa 0%, transparent 60%),
+                 radial-gradient(50% 50% at 70% 80%, #34d399 0%, transparent 60%);">
+    </div>
+  </div>
+
+  <!-- Particle canvas -->
+  <canvas id="field" class="fixed inset-0 -z-10"></canvas>
+
+  <!-- cursor ring -->
+  <div id="cursor" class="cursor-ring hidden md:block"></div>
+
+  <!-- Nav -->
+  <nav class="sticky top-0 z-40 bg-slate-950/40 backdrop-blur border-b border-white/10">
+    <div class="mx-auto max-w-7xl px-6 py-3 flex items-center justify-between">
+      <a href="#" class="font-mono font-semibold tracking-tight text-cyan-300">atri.ac</a>
+      <div class="hidden sm:flex items-center gap-5 text-sm">
+        <a href="#ideas" class="hover:text-cyan-300">Ideas</a>
+        <a href="#streams" class="hover:text-cyan-300">Streams</a>
+        <a href="#reading" class="hover:text-cyan-300">Reading</a>
+        <a href="#contact" class="hover:text-cyan-300">Links</a>
+        <button id="celebrate" class="rounded-full border border-white/20 px-3 py-1 hover:border-cyan-400/60 hover:text-cyan-300 transition">Celebrate</button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Hero -->
+  <header class="relative mx-auto max-w-7xl px-6 pt-16 pb-10">
+    <div class="text-center">
+      <h1 class="text-5xl sm:text-6xl font-extrabold tracking-tight">
+        <span class="bg-clip-text text-transparent bg-gradient-to-r from-cyan-300 via-fuchsia-300 to-emerald-300 neon">
+          now thinking
+        </span>
+      </h1>
+      <p class="mt-4 text-slate-300">Yash Kumar Atri</p>
+
+      <div class="mt-8 flex items-center justify-center gap-3">
+        <span class="text-slate-400 text-sm">focus</span>
+        <span id="rotator" class="text-cyan-300 font-semibold"></span>
+      </div>
+
+      <div class="mt-10 flex flex-wrap items-center justify-center gap-3">
+        <a href="#ideas" class="group relative overflow-hidden rounded-2xl px-5 py-3 border border-white/15 hover:border-cyan-400/70 transition">
+          <span class="relative z-10">Explore the mind space</span>
+          <span class="absolute inset-0 bg-gradient-to-r from-cyan-400/20 to-fuchsia-400/20 translate-y-[110%] group-hover:translate-y-0 transition"></span>
+        </a>
+        <a href="#streams" class="rounded-2xl px-5 py-3 border border-white/15 hover:border-emerald-400/70 transition">Live streams</a>
+        <a href="#reading" class="rounded-2xl px-5 py-3 border border-white/15 hover:border-fuchsia-400/70 transition">Reading list</a>
+      </div>
+    </div>
+
+    <!-- subtle hero ornaments -->
+    <div class="pointer-events-none absolute inset-0 -z-10">
+      <div class="absolute left-[5%] top-[25%] w-24 h-24 rounded-full bg-cyan-400/10 blur-2xl"></div>
+      <div class="absolute right-[8%] top-[30%] w-24 h-24 rounded-full bg-fuchsia-400/10 blur-2xl"></div>
+      <div class="absolute left-1/2 top-[70%] -translate-x-1/2 w-64 h-64 bg-emerald-400/10 blur-3xl rounded-full"></div>
     </div>
   </header>
 
-  <main class="mx-auto max-w-5xl px-6 py-12">
-    <section class="mb-14">
-      <h1 class="text-4xl font-extrabold tracking-tight">Hello from atri.ac</h1>
-      <p class="mt-4 text-lg text-slate-600">
-        This site is served from the GitHub repository <code>yashkumaratri/atri.ac</code>.
-        Edit <code>index.html</code> to update content. Add more pages as needed.
-      </p>
-      <div class="mt-8 flex gap-4">
-        <a href="#projects" class="rounded-2xl border px-4 py-2">View Projects</a>
-        <a href="https://github.com/yashkumaratri/atri.ac" class="rounded-2xl bg-black text-white px-4 py-2">Repo</a>
+  <!-- Ideas -->
+  <section id="ideas" class="mx-auto max-w-7xl px-6 pb-14">
+    <h2 class="reveal text-3xl font-bold">Ideas in motion</h2>
+    <p class="reveal mt-2 text-slate-300">Short sparks that guide the work. Hover to tilt. Click to expand.</p>
+
+    <div class="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+      <!-- Card template repeated -->
+      <article class="reveal glass rounded-2xl border border-white/10 p-5 will-change-transform" data-tilt data-tilt-glare data-tilt-max="8">
+        <h3 class="font-semibold">Knowledge as stream</h3>
+        <p class="mt-2 text-slate-300 text-sm">Move from snapshots to continuous updates. Evaluate learning across time.</p>
+        <button class="mt-4 inline-flex items-center gap-2 text-cyan-300 text-sm underline decoration-dotted open-modal" data-title="Knowledge as stream" data-body="A model learns on a moving river of facts. The test is not accuracy at one time, it is adaptability across time.">Learn more</button>
+      </article>
+
+      <article class="reveal glass rounded-2xl border border-white/10 p-5" data-tilt data-tilt-glare data-tilt-max="8">
+        <h3 class="font-semibold">Editing memory</h3>
+        <p class="mt-2 text-slate-300 text-sm">Precise edits that ripple safely. Local changes with global stability.</p>
+        <button class="mt-4 inline-flex items-center gap-2 text-cyan-300 text-sm underline decoration-dotted open-modal" data-title="Editing memory" data-body="Direct interventions that fix a fact, preserve skills, and remain stable during future updates.">Learn more</button>
+      </article>
+
+      <article class="reveal glass rounded-2xl border border-white/10 p-5" data-tilt data-tilt-glare data-tilt-max="8">
+        <h3 class="font-semibold">Temporal cognition</h3>
+        <p class="mt-2 text-slate-300 text-sm">Models that sense recency, decay, surprise, and change.</p>
+        <button class="mt-4 inline-flex items-center gap-2 text-cyan-300 text-sm underline decoration-dotted open-modal" data-title="Temporal cognition" data-body="Embed a notion of recency and surprise. Let models reason about change rather than ignore it.">Learn more</button>
+      </article>
+
+      <article class="reveal glass rounded-2xl border border-white/10 p-5" data-tilt data-tilt-glare data-tilt-max="8">
+        <h3 class="font-semibold">Diff as supervision</h3>
+        <p class="mt-2 text-slate-300 text-sm">Teach from deltas and events, not just raw corpora.</p>
+        <button class="mt-4 inline-flex items-center gap-2 text-cyan-300 text-sm underline decoration-dotted open-modal" data-title="Diff as supervision" data-body="Use structured change logs to train and evaluate. Learn the operators of revision.">Learn more</button>
+      </article>
+
+      <article class="reveal glass rounded-2xl border border-white/10 p-5" data-tilt data-tilt-glare data-tilt-max="8">
+        <h3 class="font-semibold">Robust retrospection</h3>
+        <p class="mt-2 text-slate-300 text-sm">Recover and reconcile conflicting memories.</p>
+        <button class="mt-4 inline-flex items-center gap-2 text-cyan-300 text-sm underline decoration-dotted open-modal" data-title="Robust retrospection" data-body="When facts flip, reconcile gracefully. Learn to explain the history of a belief.">Learn more</button>
+      </article>
+
+      <article class="reveal glass rounded-2xl border border-white/10 p-5" data-tilt data-tilt-glare data-tilt-max="8">
+        <h3 class="font-semibold">Small models, fast loops</h3>
+        <p class="mt-2 text-slate-300 text-sm">Tight feedback cycles win. Less latency, more iteration.</p>
+        <button class="mt-4 inline-flex items-center gap-2 text-cyan-300 text-sm underline decoration-dotted open-modal" data-title="Small models, fast loops" data-body="Fast edit, fast measure, fast deploy. Make improvement a daily habit.">Learn more</button>
+      </article>
+    </div>
+  </section>
+
+  <!-- Streams -->
+  <section id="streams" class="mx-auto max-w-7xl px-6 pb-14">
+    <h2 class="reveal text-3xl font-bold">Streams</h2>
+    <p class="reveal mt-2 text-slate-300">Work that evolves in public.</p>
+
+    <div class="mt-8 grid gap-5 md:grid-cols-3">
+      <a class="reveal glass rounded-2xl border border-white/10 p-5 block hover:border-cyan-400/60 transition" href="#" title="MorphStream">
+        <div class="text-sm text-slate-400">dataset</div>
+        <div class="mt-1 font-semibold">MorphStream</div>
+        <p class="mt-2 text-slate-300 text-sm">Events, diffs, and questions that move with the world.</p>
+      </a>
+      <a class="reveal glass rounded-2xl border border-white/10 p-5 block hover:border-emerald-400/60 transition" href="#" title="QA Fabric">
+        <div class="text-sm text-slate-400">generation</div>
+        <div class="mt-1 font-semibold">QA Fabric</div>
+        <p class="mt-2 text-slate-300 text-sm">High quality QA from evolving sources with strict contracts.</p>
+      </a>
+      <a class="reveal glass rounded-2xl border border-white/10 p-5 block hover:border-fuchsia-400/60 transition" href="#" title="Edit Lab">
+        <div class="text-sm text-slate-400">editing</div>
+        <div class="mt-1 font-semibold">Edit Lab</div>
+        <p class="mt-2 text-slate-300 text-sm">Evaluate safety, locality, and durability of edits.</p>
+      </a>
+    </div>
+  </section>
+
+  <!-- Reading -->
+  <section id="reading" class="mx-auto max-w-7xl px-6 pb-14">
+    <h2 class="reveal text-3xl font-bold">Reading</h2>
+    <p class="reveal mt-2 text-slate-300">A few pages open on the desk.</p>
+
+    <div class="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+      <div class="reveal glass rounded-2xl border border-white/10 p-5">
+        <div class="font-semibold">On Change and Memory</div>
+        <p class="mt-2 text-sm text-slate-300">Notes on temporal reasoning and evolving knowledge.</p>
+        <div class="mt-3 text-xs text-slate-400">1 hour ago</div>
       </div>
-    </section>
+      <div class="reveal glass rounded-2xl border border-white/10 p-5">
+        <div class="font-semibold">Systems that Learn to Edit</div>
+        <p class="mt-2 text-sm text-slate-300">Tracking locality and side effects of interventions.</p>
+        <div class="mt-3 text-xs text-slate-400">Today</div>
+      </div>
+      <div class="reveal glass rounded-2xl border border-white/10 p-5">
+        <div class="font-semibold">Streams not Snapshots</div>
+        <p class="mt-2 text-sm text-slate-300">Rethinking evaluation with event sequences.</p>
+        <div class="mt-3 text-xs text-slate-400">This week</div>
+      </div>
+    </div>
+  </section>
 
-    <section id="about" class="mb-14">
-      <h2 class="text-2xl font-semibold">About</h2>
-      <p class="mt-3 text-slate-700">
-        Replace this with your lab or portfolio. You can include Markdown-like sections,
-        or switch to a static site generator later.
-      </p>
-    </section>
+  <!-- Links -->
+  <section id="contact" class="mx-auto max-w-7xl px-6 pb-24">
+    <h2 class="reveal text-3xl font-bold">Links</h2>
+    <p class="reveal mt-2 text-slate-300">Find the rest of the work here.</p>
 
-    <section id="projects" class="mb-14">
-      <h2 class="text-2xl font-semibold">Projects</h2>
-      <ul class="mt-4 grid gap-4 md:grid-cols-2">
-        <li class="rounded-2xl border bg-white p-5">
-          <h3 class="font-semibold">Project One</h3>
-          <p class="text-slate-600 mt-2">Short description goes here.</p>
-        </li>
-        <li class="rounded-2xl border bg-white p-5">
-          <h3 class="font-semibold">Project Two</h3>
-          <p class="text-slate-600 mt-2">Short description goes here.</p>
-        </li>
-      </ul>
-    </section>
+    <div class="mt-8 flex flex-wrap gap-3">
+      <a class="reveal rounded-full border border-white/15 px-4 py-2 hover:border-cyan-400/60 hover:text-cyan-300 transition" href="https://yashkumaratri.com" target="_blank" rel="noreferrer">yashkumaratri.com</a>
+      <a class="reveal rounded-full border border-white/15 px-4 py-2 hover:border-cyan-400/60 hover:text-cyan-300 transition" href="https://github.com/yashkumaratri" target="_blank" rel="noreferrer">GitHub</a>
+      <a class="reveal rounded-full border border-white/15 px-4 py-2 hover:border-cyan-400/60 hover:text-cyan-300 transition" href="https://scholar.google.com/" target="_blank" rel="noreferrer">Scholar</a>
+      <a class="reveal rounded-full border border-white/15 px-4 py-2 hover:border-cyan-400/60 hover:text-cyan-300 transition" href="mailto:you@atri.ac">Email</a>
+    </div>
+  </section>
 
-    <section id="contact" class="mb-14">
-      <h2 class="text-2xl font-semibold">Contact</h2>
-      <p class="mt-3">Email: <a class="underline" href="mailto:you@atri.ac">you@atri.ac</a></p>
-    </section>
-  </main>
+  <!-- Modal -->
+  <div id="modal" class="fixed inset-0 z-50 hidden items-center justify-center">
+    <div class="absolute inset-0 bg-black/70"></div>
+    <div class="relative glass border border-white/10 rounded-2xl max-w-lg w-[92%] p-6">
+      <button id="closeModal" class="absolute right-3 top-3 text-slate-300 hover:text-white">✕</button>
+      <h3 id="modalTitle" class="text-xl font-semibold"></h3>
+      <p id="modalBody" class="mt-3 text-slate-200"></p>
+    </div>
+  </div>
 
-  <footer class="border-t">
-    <div class="mx-auto max-w-5xl px-6 py-8 text-sm text-slate-500">
-      © <span id="year"></span> atri.ac
+  <!-- Footer -->
+  <footer class="border-t border-white/10">
+    <div class="mx-auto max-w-7xl px-6 py-10 text-sm text-slate-400 flex flex-wrap items-center justify-between gap-3">
+      <div>© <span id="year"></span> atri.ac</div>
+      <div class="opacity-80">This space evolves with me.</div>
     </div>
   </footer>
 
+  <!-- tiny libs via CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/vanilla-tilt/1.8.0/vanilla-tilt.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js" defer></script>
+
+  <!-- Page JS -->
   <script>
+    // Rotating phrases
+    const phrases = [
+      "continual intelligence",
+      "temporal cognition",
+      "editing memory",
+      "streams not snapshots",
+      "fast loops small models"
+    ];
+    const rotator = document.getElementById('rotator');
+    let idx = 0;
+    function tick() {
+      rotator.style.opacity = 0;
+      setTimeout(() => {
+        rotator.textContent = phrases[idx % phrases.length];
+        idx++;
+        rotator.style.opacity = 1;
+      }, 200);
+    }
+    rotator.textContent = phrases[0];
+    setInterval(tick, 2000);
+
+    // Reveal on scroll
+    const revealEls = document.querySelectorAll('.reveal');
+    const io = new IntersectionObserver(entries => {
+      entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('show'); });
+    }, { threshold: 0.12 });
+    revealEls.forEach(el => io.observe(el));
+
+    // Modal
+    const modal = document.getElementById('modal');
+    const modalTitle = document.getElementById('modalTitle');
+    const modalBody = document.getElementById('modalBody');
+    document.querySelectorAll('.open-modal').forEach(btn => {
+      btn.addEventListener('click', () => {
+        modalTitle.textContent = btn.dataset.title || '';
+        modalBody.textContent = btn.dataset.body || '';
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+      });
+    });
+    document.getElementById('closeModal').addEventListener('click', () => {
+      modal.classList.add('hidden'); modal.classList.remove('flex');
+    });
+    modal.addEventListener('click', e => { if (e.target === modal.firstElementChild) { modal.classList.add('hidden'); modal.classList.remove('flex'); } });
+
+    // Confetti celebration
+    window.addEventListener('load', () => { setTimeout(() => burst(); }, 900);
+    document.getElementById('celebrate').addEventListener('click', burst));
+    function burst() {
+      const end = Date.now() + 800;
+      (function frame() {
+        confetti({ particleCount: 3, spread: 55, origin: { y: 0.6 } });
+        if (Date.now() < end) requestAnimationFrame(frame);
+      })();
+    }
+
+    // Cursor ring
+    const ring = document.getElementById('cursor');
+    window.addEventListener('mousemove', e => {
+      ring.style.transform = `translate(${e.clientX}px, ${e.clientY}px)`;
+    });
+
+    // Particle field
+    const canvas = document.getElementById('field');
+    const ctx = canvas.getContext('2d', { alpha: true });
+    let w, h, pts = [];
+    function resize() {
+      w = canvas.width = window.innerWidth;
+      h = canvas.height = window.innerHeight;
+      pts = Array.from({length: Math.min(120, Math.floor((w*h)/18000))}, () => ({
+        x: Math.random()*w,
+        y: Math.random()*h,
+        vx: (Math.random()-.5)*0.6,
+        vy: (Math.random()-.5)*0.6
+      }));
+    }
+    window.addEventListener('resize', resize); resize();
+
+    function animate() {
+      ctx.clearRect(0,0,w,h);
+      for (let p of pts) {
+        p.x += p.vx; p.y += p.vy;
+        if (p.x<0||p.x>w) p.vx*=-1;
+        if (p.y<0||p.y>h) p.vy*=-1;
+      }
+      // draw connections
+      for (let i=0;i<pts.length;i++) {
+        for (let j=i+1;j<pts.length;j++) {
+          const dx = pts[i].x-pts[j].x, dy = pts[i].y-pts[j].y;
+          const d2 = dx*dx+dy*dy;
+          if (d2 < 140*140) {
+            const a = 1 - d2/(140*140);
+            ctx.strokeStyle = `rgba(226,232,240,${0.12*a})`;
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(pts[i].x, pts[i].y);
+            ctx.lineTo(pts[j].x, pts[j].y);
+            ctx.stroke();
+          }
+        }
+      }
+      // draw nodes
+      for (let p of pts) {
+        ctx.fillStyle = 'rgba(190,242,255,0.6)';
+        ctx.beginPath();
+        ctx.arc(p.x,p.y,1.3,0,Math.PI*2);
+        ctx.fill();
+      }
+      requestAnimationFrame(animate);
+    }
+    animate();
+
+    // Year
     document.getElementById('year').textContent = new Date().getFullYear();
   </script>
 </body>
