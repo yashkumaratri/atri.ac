@@ -1,353 +1,213 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Atri.ac — Now Thinking</title>
-  <meta name="description" content="A living visual mind space by Yash Kumar Atri" />
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          fontFamily: {
-            sans: ['Inter', 'ui-sans-serif', 'system-ui'],
-            mono: ['JetBrains Mono', 'ui-monospace', 'SFMono-Regular']
-          }
-        }
-      }
-    }
-  </script>
-  <style>
-    /* Smooth fade for sections */
-    .reveal { opacity: 0; transform: translateY(12px); transition: all .7s ease; }
-    .reveal.show { opacity: 1; transform: translateY(0); }
-
-    /* Neon glow */
-    .neon { text-shadow: 0 0 12px rgba(99,102,241,.5), 0 0 30px rgba(56,189,248,.35); }
-
-    /* Glass card backdrop */
-    .glass { background: rgba(255,255,255,.08); backdrop-filter: blur(10px); }
-
-    /* Cursor ring */
-    .cursor-ring { pointer-events: none; position: fixed; left: 0; top: 0; width: 24px; height: 24px; border: 2px solid rgba(255,255,255,.55); border-radius: 9999px; transform: translate(-50%,-50%); transition: transform .08s ease; z-index: 90; }
-
-    /* Hide scrollbar but keep scroll */
-    ::-webkit-scrollbar { width: 0; height: 0; }
-    html { scroll-behavior: smooth; }
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>atri.ac • flowfield</title>
+<style>
+  html,body{margin:0;height:100%;background:#050510;overflow:hidden}
+  canvas{display:block;width:100%;height:100%}
+  .hud{
+    position:fixed;left:12px;bottom:12px;color:#dbeafe;font-family:system-ui,Inter,Arial,sans-serif;
+    font-size:12px;line-height:1.35;background:rgba(5,5,20,.35);backdrop-filter:blur(6px);
+    border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:10px 12px;user-select:none
+  }
+  .hud b{color:#a5f3fc}
+  .pulse{animation:pulse 1.8s ease-in-out infinite}
+  @keyframes pulse{0%{opacity:.55}50%{opacity:1}100%{opacity:.55}}
+</style>
 </head>
-<body class="bg-slate-950 text-slate-100 overflow-x-hidden">
+<body>
+<canvas id="fx"></canvas>
+<div class="hud">
+  <div><b>atri.ac</b> flowfield</div>
+  <div class="pulse">click or press <b>C</b> to change colors</div>
+  <div>press <b>Space</b> to burst • press <b>H</b> to hide UI</div>
+  <div>drag to attract • <b>1-5</b> quality • <b>R</b> reset</div>
+</div>
 
-  <!-- Animated gradient backdrop -->
-  <div class="fixed inset-0 -z-20">
-    <div class="absolute -inset-[40%] blur-3xl opacity-40 animate-pulse"
-         style="background: radial-gradient(60% 60% at 50% 40%, #22d3ee 0%, transparent 60%),
-                 radial-gradient(40% 40% at 30% 70%, #a78bfa 0%, transparent 60%),
-                 radial-gradient(50% 50% at 70% 80%, #34d399 0%, transparent 60%);">
-    </div>
-  </div>
+<script>
+/* ========= Simplex Noise (2D) =========
+   Adapted from Stefan Gustavson public domain reference */
+const Simplex2D=(function(){
+  const grad3=new Float32Array([1,1,-1,1,1,-1,-1,-1,1,0,-1,0,1,0,-1,0,0,1,0,-1,0,1,0,-1]);
+  const p=new Uint8Array(256); for(let i=0;i<256;i++) p[i]=i;
+  function seed(s){
+    let n=s>>>0; for(let i=255;i>0;i--){n=(n*1664525+1013904223)>>>0; const r=n%(i+1); const t=p[i]; p[i]=p[r]; p[r]=t;}
+    perm.set(p); permMod12.set(p.map(v=>v%12));
+  }
+  const perm=new Uint8Array(512), permMod12=new Uint8Array(512); seed(1337);
+  function noise(xin,yin){
+    const F2=0.5*(Math.sqrt(3)-1), s=(xin+yin)*F2, i=Math.floor(xin+s), j=Math.floor(yin+s);
+    const G2=(3-Math.sqrt(3))/6, t=(i+j)*G2, X0=i-t, Y0=j-t, x0=xin-X0, y0=yin-Y0;
+    let i1, j1; if(x0>y0){i1=1;j1=0;} else {i1=0;j1=1;}
+    const x1=x0-i1+G2, y1=y0-j1+G2, x2=x0-1+2*G2, y2=y0-1+2*G2;
+    const ii=i&255, jj=j&255;
+    const gi0=permMod12[ii+perm[jj]]*2, gi1=permMod12[ii+i1+perm[jj+j1]]*2, gi2=permMod12[ii+1+perm[jj+1]]*2;
+    let n0=0,n1=0,n2=0, t0=0.5-x0*x0-y0*y0; if(t0>=0){t0*=t0; n0=t0*t0*(grad3[gi0]*x0+grad3[gi0+1]*y0);}
+    let t1=0.5-x1*x1-y1*y1; if(t1>=0){t1*=t1; n1=t1*t1*(grad3[gi1]*x1+grad3[gi1+1]*y1);}
+    let t2=0.5-x2*x2-y2*y2; if(t2>=0){t2*=t2; n2=t2*t2*(grad3[gi2]*x2+grad3[gi2+1]*y2);}
+    return 70*(n0+n1+n2);
+  }
+  noise.seed=seed; return noise;
+})();
 
-  <!-- Particle canvas -->
-  <canvas id="field" class="fixed inset-0 -z-10"></canvas>
+/* ========= Flow Field ========= */
+const canvas=document.getElementById('fx');
+const ctx=canvas.getContext('2d');
+let DPR=Math.min(devicePixelRatio||1,2);
+let W,H,particles=[],fieldScale=0.0017, time=0, zInc=0.0012;
+let mouse={x:0,y:0,down:false};
+let quality=4; // 1..5
+const palettes=[
+  // cyan violet emerald
+  t=>`hsla(${200+60*Math.sin(t)},100%,70%,.7)`,
+  // sunrise
+  t=>`hsla(${20+40*Math.sin(t)},90%,65%,.7)`,
+  // aurora
+  t=>`hsla(${120+80*Math.sin(t*0.8)},80%,70%,.75)`,
+  // neon ocean
+  t=>`hsla(${180+30*Math.sin(t*1.2)},100%,60%,.8)`,
+  // candy
+  t=>`hsla(${300+120*Math.sin(t*0.9)},95%,70%,.75)`
+];
+let paletteIndex=0;
 
-  <!-- cursor ring -->
-  <div id="cursor" class="cursor-ring hidden md:block"></div>
+function resize(){
+  DPR=Math.min(devicePixelRatio||1,2);
+  W=canvas.width=Math.floor(innerWidth*DPR);
+  H=canvas.height=Math.floor(innerHeight*DPR);
+  canvas.style.width=innerWidth+'px';
+  canvas.style.height=innerHeight+'px';
+  resetParticles();
+}
+window.addEventListener('resize',resize); resize();
 
-  <!-- Nav -->
-  <nav class="sticky top-0 z-40 bg-slate-950/40 backdrop-blur border-b border-white/10">
-    <div class="mx-auto max-w-7xl px-6 py-3 flex items-center justify-between">
-      <a href="#" class="font-mono font-semibold tracking-tight text-cyan-300">atri.ac</a>
-      <div class="hidden sm:flex items-center gap-5 text-sm">
-        <a href="#ideas" class="hover:text-cyan-300">Ideas</a>
-        <a href="#streams" class="hover:text-cyan-300">Streams</a>
-        <a href="#reading" class="hover:text-cyan-300">Reading</a>
-        <a href="#contact" class="hover:text-cyan-300">Links</a>
-        <button id="celebrate" class="rounded-full border border-white/20 px-3 py-1 hover:border-cyan-400/60 hover:text-cyan-300 transition">Celebrate</button>
-      </div>
-    </div>
-  </nav>
-
-  <!-- Hero -->
-  <header class="relative mx-auto max-w-7xl px-6 pt-16 pb-10">
-    <div class="text-center">
-      <h1 class="text-5xl sm:text-6xl font-extrabold tracking-tight">
-        <span class="bg-clip-text text-transparent bg-gradient-to-r from-cyan-300 via-fuchsia-300 to-emerald-300 neon">
-          now thinking
-        </span>
-      </h1>
-      <p class="mt-4 text-slate-300">Yash Kumar Atri</p>
-
-      <div class="mt-8 flex items-center justify-center gap-3">
-        <span class="text-slate-400 text-sm">focus</span>
-        <span id="rotator" class="text-cyan-300 font-semibold"></span>
-      </div>
-
-      <div class="mt-10 flex flex-wrap items-center justify-center gap-3">
-        <a href="#ideas" class="group relative overflow-hidden rounded-2xl px-5 py-3 border border-white/15 hover:border-cyan-400/70 transition">
-          <span class="relative z-10">Explore the mind space</span>
-          <span class="absolute inset-0 bg-gradient-to-r from-cyan-400/20 to-fuchsia-400/20 translate-y-[110%] group-hover:translate-y-0 transition"></span>
-        </a>
-        <a href="#streams" class="rounded-2xl px-5 py-3 border border-white/15 hover:border-emerald-400/70 transition">Live streams</a>
-        <a href="#reading" class="rounded-2xl px-5 py-3 border border-white/15 hover:border-fuchsia-400/70 transition">Reading list</a>
-      </div>
-    </div>
-
-    <!-- subtle hero ornaments -->
-    <div class="pointer-events-none absolute inset-0 -z-10">
-      <div class="absolute left-[5%] top-[25%] w-24 h-24 rounded-full bg-cyan-400/10 blur-2xl"></div>
-      <div class="absolute right-[8%] top-[30%] w-24 h-24 rounded-full bg-fuchsia-400/10 blur-2xl"></div>
-      <div class="absolute left-1/2 top-[70%] -translate-x-1/2 w-64 h-64 bg-emerald-400/10 blur-3xl rounded-full"></div>
-    </div>
-  </header>
-
-  <!-- Ideas -->
-  <section id="ideas" class="mx-auto max-w-7xl px-6 pb-14">
-    <h2 class="reveal text-3xl font-bold">Ideas in motion</h2>
-    <p class="reveal mt-2 text-slate-300">Short sparks that guide the work. Hover to tilt. Click to expand.</p>
-
-    <div class="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-      <!-- Card template repeated -->
-      <article class="reveal glass rounded-2xl border border-white/10 p-5 will-change-transform" data-tilt data-tilt-glare data-tilt-max="8">
-        <h3 class="font-semibold">Knowledge as stream</h3>
-        <p class="mt-2 text-slate-300 text-sm">Move from snapshots to continuous updates. Evaluate learning across time.</p>
-        <button class="mt-4 inline-flex items-center gap-2 text-cyan-300 text-sm underline decoration-dotted open-modal" data-title="Knowledge as stream" data-body="A model learns on a moving river of facts. The test is not accuracy at one time, it is adaptability across time.">Learn more</button>
-      </article>
-
-      <article class="reveal glass rounded-2xl border border-white/10 p-5" data-tilt data-tilt-glare data-tilt-max="8">
-        <h3 class="font-semibold">Editing memory</h3>
-        <p class="mt-2 text-slate-300 text-sm">Precise edits that ripple safely. Local changes with global stability.</p>
-        <button class="mt-4 inline-flex items-center gap-2 text-cyan-300 text-sm underline decoration-dotted open-modal" data-title="Editing memory" data-body="Direct interventions that fix a fact, preserve skills, and remain stable during future updates.">Learn more</button>
-      </article>
-
-      <article class="reveal glass rounded-2xl border border-white/10 p-5" data-tilt data-tilt-glare data-tilt-max="8">
-        <h3 class="font-semibold">Temporal cognition</h3>
-        <p class="mt-2 text-slate-300 text-sm">Models that sense recency, decay, surprise, and change.</p>
-        <button class="mt-4 inline-flex items-center gap-2 text-cyan-300 text-sm underline decoration-dotted open-modal" data-title="Temporal cognition" data-body="Embed a notion of recency and surprise. Let models reason about change rather than ignore it.">Learn more</button>
-      </article>
-
-      <article class="reveal glass rounded-2xl border border-white/10 p-5" data-tilt data-tilt-glare data-tilt-max="8">
-        <h3 class="font-semibold">Diff as supervision</h3>
-        <p class="mt-2 text-slate-300 text-sm">Teach from deltas and events, not just raw corpora.</p>
-        <button class="mt-4 inline-flex items-center gap-2 text-cyan-300 text-sm underline decoration-dotted open-modal" data-title="Diff as supervision" data-body="Use structured change logs to train and evaluate. Learn the operators of revision.">Learn more</button>
-      </article>
-
-      <article class="reveal glass rounded-2xl border border-white/10 p-5" data-tilt data-tilt-glare data-tilt-max="8">
-        <h3 class="font-semibold">Robust retrospection</h3>
-        <p class="mt-2 text-slate-300 text-sm">Recover and reconcile conflicting memories.</p>
-        <button class="mt-4 inline-flex items-center gap-2 text-cyan-300 text-sm underline decoration-dotted open-modal" data-title="Robust retrospection" data-body="When facts flip, reconcile gracefully. Learn to explain the history of a belief.">Learn more</button>
-      </article>
-
-      <article class="reveal glass rounded-2xl border border-white/10 p-5" data-tilt data-tilt-glare data-tilt-max="8">
-        <h3 class="font-semibold">Small models, fast loops</h3>
-        <p class="mt-2 text-slate-300 text-sm">Tight feedback cycles win. Less latency, more iteration.</p>
-        <button class="mt-4 inline-flex items-center gap-2 text-cyan-300 text-sm underline decoration-dotted open-modal" data-title="Small models, fast loops" data-body="Fast edit, fast measure, fast deploy. Make improvement a daily habit.">Learn more</button>
-      </article>
-    </div>
-  </section>
-
-  <!-- Streams -->
-  <section id="streams" class="mx-auto max-w-7xl px-6 pb-14">
-    <h2 class="reveal text-3xl font-bold">Streams</h2>
-    <p class="reveal mt-2 text-slate-300">Work that evolves in public.</p>
-
-    <div class="mt-8 grid gap-5 md:grid-cols-3">
-      <a class="reveal glass rounded-2xl border border-white/10 p-5 block hover:border-cyan-400/60 transition" href="#" title="MorphStream">
-        <div class="text-sm text-slate-400">dataset</div>
-        <div class="mt-1 font-semibold">MorphStream</div>
-        <p class="mt-2 text-slate-300 text-sm">Events, diffs, and questions that move with the world.</p>
-      </a>
-      <a class="reveal glass rounded-2xl border border-white/10 p-5 block hover:border-emerald-400/60 transition" href="#" title="QA Fabric">
-        <div class="text-sm text-slate-400">generation</div>
-        <div class="mt-1 font-semibold">QA Fabric</div>
-        <p class="mt-2 text-slate-300 text-sm">High quality QA from evolving sources with strict contracts.</p>
-      </a>
-      <a class="reveal glass rounded-2xl border border-white/10 p-5 block hover:border-fuchsia-400/60 transition" href="#" title="Edit Lab">
-        <div class="text-sm text-slate-400">editing</div>
-        <div class="mt-1 font-semibold">Edit Lab</div>
-        <p class="mt-2 text-slate-300 text-sm">Evaluate safety, locality, and durability of edits.</p>
-      </a>
-    </div>
-  </section>
-
-  <!-- Reading -->
-  <section id="reading" class="mx-auto max-w-7xl px-6 pb-14">
-    <h2 class="reveal text-3xl font-bold">Reading</h2>
-    <p class="reveal mt-2 text-slate-300">A few pages open on the desk.</p>
-
-    <div class="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-      <div class="reveal glass rounded-2xl border border-white/10 p-5">
-        <div class="font-semibold">On Change and Memory</div>
-        <p class="mt-2 text-sm text-slate-300">Notes on temporal reasoning and evolving knowledge.</p>
-        <div class="mt-3 text-xs text-slate-400">1 hour ago</div>
-      </div>
-      <div class="reveal glass rounded-2xl border border-white/10 p-5">
-        <div class="font-semibold">Systems that Learn to Edit</div>
-        <p class="mt-2 text-sm text-slate-300">Tracking locality and side effects of interventions.</p>
-        <div class="mt-3 text-xs text-slate-400">Today</div>
-      </div>
-      <div class="reveal glass rounded-2xl border border-white/10 p-5">
-        <div class="font-semibold">Streams not Snapshots</div>
-        <p class="mt-2 text-sm text-slate-300">Rethinking evaluation with event sequences.</p>
-        <div class="mt-3 text-xs text-slate-400">This week</div>
-      </div>
-    </div>
-  </section>
-
-  <!-- Links -->
-  <section id="contact" class="mx-auto max-w-7xl px-6 pb-24">
-    <h2 class="reveal text-3xl font-bold">Links</h2>
-    <p class="reveal mt-2 text-slate-300">Find the rest of the work here.</p>
-
-    <div class="mt-8 flex flex-wrap gap-3">
-      <a class="reveal rounded-full border border-white/15 px-4 py-2 hover:border-cyan-400/60 hover:text-cyan-300 transition" href="https://yashkumaratri.com" target="_blank" rel="noreferrer">yashkumaratri.com</a>
-      <a class="reveal rounded-full border border-white/15 px-4 py-2 hover:border-cyan-400/60 hover:text-cyan-300 transition" href="https://github.com/yashkumaratri" target="_blank" rel="noreferrer">GitHub</a>
-      <a class="reveal rounded-full border border-white/15 px-4 py-2 hover:border-cyan-400/60 hover:text-cyan-300 transition" href="https://scholar.google.com/" target="_blank" rel="noreferrer">Scholar</a>
-      <a class="reveal rounded-full border border-white/15 px-4 py-2 hover:border-cyan-400/60 hover:text-cyan-300 transition" href="mailto:you@atri.ac">Email</a>
-    </div>
-  </section>
-
-  <!-- Modal -->
-  <div id="modal" class="fixed inset-0 z-50 hidden items-center justify-center">
-    <div class="absolute inset-0 bg-black/70"></div>
-    <div class="relative glass border border-white/10 rounded-2xl max-w-lg w-[92%] p-6">
-      <button id="closeModal" class="absolute right-3 top-3 text-slate-300 hover:text-white">✕</button>
-      <h3 id="modalTitle" class="text-xl font-semibold"></h3>
-      <p id="modalBody" class="mt-3 text-slate-200"></p>
-    </div>
-  </div>
-
-  <!-- Footer -->
-  <footer class="border-t border-white/10">
-    <div class="mx-auto max-w-7xl px-6 py-10 text-sm text-slate-400 flex flex-wrap items-center justify-between gap-3">
-      <div>© <span id="year"></span> atri.ac</div>
-      <div class="opacity-80">This space evolves with me.</div>
-    </div>
-  </footer>
-
-  <!-- tiny libs via CDN -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/vanilla-tilt/1.8.0/vanilla-tilt.min.js" defer></script>
-  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js" defer></script>
-
-  <!-- Page JS -->
-  <script>
-    // Rotating phrases
-    const phrases = [
-      "continual intelligence",
-      "temporal cognition",
-      "editing memory",
-      "streams not snapshots",
-      "fast loops small models"
-    ];
-    const rotator = document.getElementById('rotator');
-    let idx = 0;
-    function tick() {
-      rotator.style.opacity = 0;
-      setTimeout(() => {
-        rotator.textContent = phrases[idx % phrases.length];
-        idx++;
-        rotator.style.opacity = 1;
-      }, 200);
-    }
-    rotator.textContent = phrases[0];
-    setInterval(tick, 2000);
-
-    // Reveal on scroll
-    const revealEls = document.querySelectorAll('.reveal');
-    const io = new IntersectionObserver(entries => {
-      entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('show'); });
-    }, { threshold: 0.12 });
-    revealEls.forEach(el => io.observe(el));
-
-    // Modal
-    const modal = document.getElementById('modal');
-    const modalTitle = document.getElementById('modalTitle');
-    const modalBody = document.getElementById('modalBody');
-    document.querySelectorAll('.open-modal').forEach(btn => {
-      btn.addEventListener('click', () => {
-        modalTitle.textContent = btn.dataset.title || '';
-        modalBody.textContent = btn.dataset.body || '';
-        modal.classList.remove('hidden');
-        modal.classList.add('flex');
-      });
+function resetParticles(){
+  const count=Math.floor((W*H)/(1400/(quality*quality))); // scales with quality and screen
+  particles.length=0;
+  for(let i=0;i<count;i++){
+    particles.push({
+      x:Math.random()*W, y:Math.random()*H,
+      vx:0, vy:0,
+      life: 200+Math.random()*600,
+      hueSeed:Math.random()*Math.PI*2
     });
-    document.getElementById('closeModal').addEventListener('click', () => {
-      modal.classList.add('hidden'); modal.classList.remove('flex');
-    });
-    modal.addEventListener('click', e => { if (e.target === modal.firstElementChild) { modal.classList.add('hidden'); modal.classList.remove('flex'); } });
+  }
+  ctx.clearRect(0,0,W,H);
+  // prefill a faint background
+  ctx.fillStyle='rgba(5,5,16,1)'; ctx.fillRect(0,0,W,H);
+}
 
-    // Confetti celebration
-    window.addEventListener('load', () => { setTimeout(() => burst(); }, 900);
-    document.getElementById('celebrate').addEventListener('click', burst));
-    function burst() {
-      const end = Date.now() + 800;
-      (function frame() {
-        confetti({ particleCount: 3, spread: 55, origin: { y: 0.6 } });
-        if (Date.now() < end) requestAnimationFrame(frame);
-      })();
+/* Vector field from layered simplex noise */
+function field(x,y,t){
+  const n1=Simplex2D(x*fieldScale,y*fieldScale + t*0.35);
+  const n2=Simplex2D((x+1000)*fieldScale*0.6,(y-1000)*fieldScale*0.6 + t*0.22);
+  const a=(n1*1.2 + n2*0.8) * Math.PI; // angle
+  const m=0.6+0.4*Math.sin(n1*2.0 + t*0.5); // magnitude
+  return {ax:Math.cos(a)*m, ay:Math.sin(a)*m};
+}
+
+/* Interaction: soft attractor around mouse when held */
+function attract(p){
+  const dx=(mouse.x - p.x), dy=(mouse.y - p.y);
+  const d2=dx*dx+dy*dy; if(d2<1) return;
+  const f= Math.min(1/(d2*0.000002), 0.2);
+  p.vx += dx*f; p.vy += dy*f;
+}
+
+/* Draw trail as line segments with additive glow */
+function step(){
+  requestAnimationFrame(step);
+  time += zInc;
+
+  // slow background fade to create trails
+  ctx.globalCompositeOperation='source-over';
+  ctx.fillStyle='rgba(5,5,18,0.06)'; // low alpha to keep long trails
+  ctx.fillRect(0,0,W,H);
+
+  ctx.globalCompositeOperation='lighter';
+  const colorFn=palettes[paletteIndex%palettes.length];
+
+  for(let i=0;i<particles.length;i++){
+    const p=particles[i];
+    // field acceleration
+    const v=field(p.x,p.y,time);
+    p.vx += v.ax*0.35;
+    p.vy += v.ay*0.35;
+
+    // mouse attractor
+    if(mouse.down) attract(p);
+
+    // mild viscosity
+    p.vx*=0.965; p.vy*=0.965;
+
+    const nx=p.x+p.vx, ny=p.y+p.vy;
+
+    // wrap edges
+    if(nx<0||nx>W||ny<0||ny>H){ p.x=Math.random()*W; p.y=Math.random()*H; p.vx=p.vy=0; p.life=200+Math.random()*600; continue; }
+
+    // color varies by particle phase and global time
+    const t = p.hueSeed + time*1.6;
+    ctx.strokeStyle=colorFn(Math.sin(t));
+    ctx.lineWidth= DPR * (0.6 + 0.6*Math.sin(t*2.0));
+    ctx.beginPath(); ctx.moveTo(p.x,p.y); ctx.lineTo(nx,ny); ctx.stroke();
+
+    p.x=nx; p.y=ny;
+    if(--p.life<=0){ // respawn softly
+      p.x=Math.random()*W; p.y=Math.random()*H; p.vx=p.vy=0; p.life=200+Math.random()*600;
     }
+  }
+}
+step();
 
-    // Cursor ring
-    const ring = document.getElementById('cursor');
-    window.addEventListener('mousemove', e => {
-      ring.style.transform = `translate(${e.clientX}px, ${e.clientY}px)`;
-    });
+/* Mouse */
+function setMouse(e){
+  const rect=canvas.getBoundingClientRect();
+  mouse.x=(e.clientX-rect.left)*DPR;
+  mouse.y=(e.clientY-rect.top)*DPR;
+}
+window.addEventListener('mousemove',setMouse);
+window.addEventListener('touchmove',e=>{if(e.touches[0]) setMouse(e.touches[0]);},{passive:true});
+window.addEventListener('mousedown',e=>{mouse.down=true; setMouse(e); paletteIndex++; burst(1200);});
+window.addEventListener('mouseup',()=>{mouse.down=false;});
+window.addEventListener('touchstart',e=>{mouse.down=true; if(e.touches[0]) setMouse(e.touches[0]); paletteIndex++; burst(1200);},{passive:true});
+window.addEventListener('touchend',()=>{mouse.down=false;});
 
-    // Particle field
-    const canvas = document.getElementById('field');
-    const ctx = canvas.getContext('2d', { alpha: true });
-    let w, h, pts = [];
-    function resize() {
-      w = canvas.width = window.innerWidth;
-      h = canvas.height = window.innerHeight;
-      pts = Array.from({length: Math.min(120, Math.floor((w*h)/18000))}, () => ({
-        x: Math.random()*w,
-        y: Math.random()*h,
-        vx: (Math.random()-.5)*0.6,
-        vy: (Math.random()-.5)*0.6
-      }));
-    }
-    window.addEventListener('resize', resize); resize();
+/* Burst: quick outward kick for a wave effect */
+function burst(ms=900){
+  for(const p of particles){
+    const dx=p.x - mouse.x, dy=p.y - mouse.y;
+    const d=Math.hypot(dx,dy)+0.0001;
+    const power = 7/(1+d*0.01);
+    p.vx += (dx/d)*power;
+    p.vy += (dy/d)*power;
+  }
+  // momentary faster z to morph the field
+  const base=zInc; zInc=base*3;
+  setTimeout(()=> zInc=base, ms);
+}
 
-    function animate() {
-      ctx.clearRect(0,0,w,h);
-      for (let p of pts) {
-        p.x += p.vx; p.y += p.vy;
-        if (p.x<0||p.x>w) p.vx*=-1;
-        if (p.y<0||p.y>h) p.vy*=-1;
-      }
-      // draw connections
-      for (let i=0;i<pts.length;i++) {
-        for (let j=i+1;j<pts.length;j++) {
-          const dx = pts[i].x-pts[j].x, dy = pts[i].y-pts[j].y;
-          const d2 = dx*dx+dy*dy;
-          if (d2 < 140*140) {
-            const a = 1 - d2/(140*140);
-            ctx.strokeStyle = `rgba(226,232,240,${0.12*a})`;
-            ctx.lineWidth = 1;
-            ctx.beginPath();
-            ctx.moveTo(pts[i].x, pts[i].y);
-            ctx.lineTo(pts[j].x, pts[j].y);
-            ctx.stroke();
-          }
-        }
-      }
-      // draw nodes
-      for (let p of pts) {
-        ctx.fillStyle = 'rgba(190,242,255,0.6)';
-        ctx.beginPath();
-        ctx.arc(p.x,p.y,1.3,0,Math.PI*2);
-        ctx.fill();
-      }
-      requestAnimationFrame(animate);
-    }
-    animate();
+/* Keys */
+window.addEventListener('keydown',e=>{
+  if(e.code==='Space'){ e.preventDefault(); burst(); }
+  if(e.key==='c' || e.key==='C'){ paletteIndex++; }
+  if(e.key==='h' || e.key==='H'){ document.querySelector('.hud').style.display =
+      (document.querySelector('.hud').style.display==='none') ? 'block' : 'none'; }
+  if(e.key==='r' || e.key==='R'){ resetParticles(); }
+  if(/[1-5]/.test(e.key)){ quality=parseInt(e.key,10); resetParticles(); }
+});
 
-    // Year
-    document.getElementById('year').textContent = new Date().getFullYear();
-  </script>
+/* Nice background hue drift */
+let hueBase=210, hueTimer=0;
+setInterval(()=>{ hueBase=(hueBase+0.3)%360;
+  document.body.style.background=`hsl(${hueBase},40%,6%)`;
+  // small palette auto shift every 10 seconds
+  if((++hueTimer)%600===0) paletteIndex++;
+},50);
+
+/* Seed noise with time so each load is unique yet smooth */
+Simplex2D.seed((Date.now()&0xffffffff) ^ 0x9e3779b9);
+</script>
 </body>
 </html>
