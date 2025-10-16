@@ -1,391 +1,229 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>atri.ac • ambient</title>
-<style>
-  html,body{margin:0;height:100%;background:#050510;overflow:hidden}
-  canvas{display:block;width:100%;height:100%}
-  .ui{position:fixed;left:12px;bottom:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;
-      color:#dbeafe;font:12px/1.35 system-ui,Inter,Arial,sans-serif;background:rgba(5,5,20,.35);
-      backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:8px 10px;user-select:none;z-index:10}
-  .ui *{accent-color:#67e8f9}
-  .btn,.sel,.rng{border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.06);color:#dbeafe;
-      border-radius:999px;padding:4px 10px;font:12px system-ui;cursor:pointer}
-  .sel{padding:3px 8px}
-  .rng{height:24px;border-radius:12px}
-  .hint{opacity:.8}
-  .badge{padding:2px 8px;border-radius:999px;background:rgba(103,232,249,.15);border:1px solid rgba(103,232,249,.35)}
-  .chk{display:flex;gap:6px;align-items:center;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.06);
-       padding:4px 8px;border-radius:999px}
-  .hide{display:none}
-  .top{position:fixed;top:12px;left:12px;color:#c7d2fe;font:12px system-ui;background:rgba(5,5,20,.35);
-      border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:6px 8px;z-index:10}
-</style>
-</head>
-<body>
-<canvas id="fx"></canvas>
-<!-- offscreen for bloom pass -->
-<canvas id="low" class="hide"></canvas>
-
-<div class="top" id="help">
-  Click changes palette • Space burst • C colors • S snapshot • F fullscreen • P pause • M mic • 1 to 8 quality • B bloom
-</div>
-
-<div class="ui" id="ui">
-  <span class="badge">atri.ac</span>
-  <select id="scene" class="sel" title="Scene">
-    <option value="flow">Flowfield</option>
-    <option value="orbs">Orbs</option>
-    <option value="ribbons">Ribbons</option>
-  </select>
-  <select id="palette" class="sel" title="Palette"></select>
-  <label class="hint">Q<input id="quality" class="rng" type="range" min="1" max="8" value="4"></label>
-  <label class="hint">FPS<input id="fps" class="rng" type="range" min="24" max="120" value="60"></label>
-  <label class="chk"><input id="bloom" type="checkbox"> Bloom</label>
-  <label class="chk"><input id="auto" type="checkbox"> Auto cycle</label>
-  <button id="micBtn" class="btn" title="Audio reactive">Mic Off</button>
-  <button id="pauseBtn" class="btn">Pause</button>
-  <button id="shotBtn" class="btn">Snapshot</button>
-  <button id="fsBtn" class="btn">Fullscreen</button>
-  <button id="hideBtn" class="btn">Hide UI</button>
-</div>
-
-<script>
-/* ========= Utilities ========= */
-const DPR=Math.min(devicePixelRatio||1,2);
-const canvas=document.getElementById('fx');
-const ctx=canvas.getContext('2d',{alpha:false});
-const low=document.getElementById('low');
-const lctx=low.getContext('2d',{alpha:true});
-let W=0,H=0, running=true, lastFrame=0, targetFPS=60, frameCap=1000/60;
-function resize(){
-  W=canvas.width=Math.floor(innerWidth*DPR);
-  H=canvas.height=Math.floor(innerHeight*DPR);
-  canvas.style.width=innerWidth+'px'; canvas.style.height=innerHeight+'px';
-  low.width=Math.max(1,Math.floor(W*0.3)); low.height=Math.max(1,Math.floor(H*0.3));
-}
-addEventListener('resize',resize); resize();
-const $=s=>document.querySelector(s);
-
-/* ========= Palettes ========= */
-const PALETTES=[
-  {name:'Aurora', fn:t=>`hsla(${120+80*Math.sin(t)},90%,70%,0.75)`},
-  {name:'Neon Ocean', fn:t=>`hsla(${180+30*Math.sin(t*1.2)},100%,60%,0.82)`},
-  {name:'Sunrise', fn:t=>`hsla(${20+40*Math.sin(t)},92%,66%,0.78)`},
-  {name:'Candy', fn:t=>`hsla(${300+120*Math.sin(t*0.9)},95%,72%,0.78)`},
-  {name:'Cyan Violet', fn:t=>`hsla(${200+60*Math.sin(t)},100%,70%,0.78)`},
-  {name:'Lime Punch', fn:t=>`hsla(${90+60*Math.cos(t*1.4)},100%,62%,0.82)`},
-  {name:'Magma', fn:t=>`hsla(${10+10*Math.sin(t*0.7)},90%,60%,0.84)`},
-  {name:'Glacier', fn:t=>`hsla(${200+20*Math.cos(t)},95%,80%,0.82)`}
-];
-const paletteSel=$('#palette'); PALETTES.forEach((p,i)=>{ const o=document.createElement('option'); o.value=i; o.textContent=p.name; paletteSel.appendChild(o); });
-
-let paletteIndex= +localStorage.getItem('palIdx') || 0;
-paletteSel.value=paletteIndex;
-
-/* ========= Simplex Noise 2D ========= */
-const Simplex2D=(function(){
-  const grad3=new Float32Array([1,1,-1,1,1,-1,-1,-1,1,0,-1,0,1,0,-1,0,0,1,0,-1,0,1,0,-1]);
-  const p=new Uint8Array(256); for(let i=0;i<256;i++) p[i]=i;
-  function seed(s){ let n=s>>>0; for(let i=255;i>0;i--){ n=(n*1664525+1013904223)>>>0; const r=n%(i+1); const t=p[i]; p[i]=p[r]; p[r]=t; }
-    perm.set(p); permMod12.set(p.map(v=>v%12)); }
-  const perm=new Uint8Array(512), permMod12=new Uint8Array(512); seed( Date.now()^0x9e3779b9 );
-  function noise(xin,yin){
-    const F2=0.5*(Math.sqrt(3)-1), s=(xin+yin)*F2, i=Math.floor(xin+s), j=Math.floor(yin+s);
-    const G2=(3-Math.sqrt(3))/6, t=(i+j)*G2, X0=i-t, Y0=j-t, x0=xin-X0, y0=yin-Y0;
-    let i1, j1; if(x0>y0){i1=1;j1=0;} else {i1=0;j1=1;}
-    const x1=x0-i1+G2, y1=y0-j1+G2, x2=x0-1+2*G2, y2=y0-1+2*G2;
-    const ii=i&255, jj=j&255;
-    const gi0=permMod12[ii+perm[jj]]*2, gi1=permMod12[ii+i1+perm[jj+j1]]*2, gi2=permMod12[ii+1+perm[jj+1]]*2;
-    let n0=0,n1=0,n2=0, t0=0.5-x0*x0-y0*y0; if(t0>=0){t0*=t0; n0=t0*t0*(grad3[gi0]*x0+grad3[gi0+1]*y0);}
-    let t1=0.5-x1*x1-y1*y1; if(t1>=0){t1*=t1; n1=t1*t1*(grad3[gi1]*x1+grad3[gi1+1]*y1);}
-    let t2=0.5-x2*x2-y2*y2; if(t2>=0){t2*=t2; n2=t2*t2*(grad3[gi2]*x2+grad3[gi2+1]*y2);}
-    return 70*(n0+n1+n2);
-  }
-  noise.seed=seed; return noise;
-})();
-
-/* ========= Interaction and Audio ========= */
-const mouse={x:W*0.5, y:H*0.5, down:false};
-addEventListener('mousemove',e=>{mouse.x=e.clientX*DPR; mouse.y=e.clientY*DPR;});
-addEventListener('mousedown',()=>{mouse.down=true; nextPalette(); burst(1200);});
-addEventListener('mouseup',()=>{mouse.down=false;});
-addEventListener('touchstart',e=>{mouse.down=true; const t=e.touches[0]; mouse.x=t.clientX*DPR; mouse.y=t.clientY*DPR; nextPalette(); burst(1200);},{passive:true});
-addEventListener('touchmove',e=>{const t=e.touches[0]; if(t){ mouse.x=t.clientX*DPR; mouse.y=t.clientY*DPR; }},{passive:true});
-addEventListener('touchend',()=>{mouse.down=false;});
-
-let audioCtx=null, analyser=null, freqBuf=null, micOn=false;
-async function toggleMic(){
-  if(micOn){ micOn=false; $('#micBtn').textContent='Mic Off'; return; }
-  try{
-    audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)();
-    const stream = await navigator.mediaDevices.getUserMedia({audio:true});
-    const src = audioCtx.createMediaStreamSource(stream);
-    analyser = audioCtx.createAnalyser(); analyser.fftSize=1024; analyser.smoothingTimeConstant=0.85;
-    src.connect(analyser); freqBuf = new Uint8Array(analyser.frequencyBinCount);
-    micOn=true; $('#micBtn').textContent='Mic On';
-  }catch(e){ alert('Microphone permission denied'); }
-}
-$('#micBtn').onclick=toggleMic;
-
-/* ========= Settings ========= */
-let time=0, zInc=0.0012, quality = +localStorage.getItem('qual') || 4;
-$('#quality').value=quality; $('#quality').oninput=e=>{ quality=+e.target.value; saveSettings(); rebuildAll(); };
-
-$('#fps').oninput=e=>{ targetFPS=+e.target.value; frameCap=1000/targetFPS; };
-$('#fps').value= +localStorage.getItem('fps') || 60; targetFPS=$('#fps').value; frameCap=1000/targetFPS;
-
-const sceneSel=$('#scene'); sceneSel.value = localStorage.getItem('scene') || 'flow';
-sceneSel.onchange=()=>{ saveSettings(); rebuildAll(); };
-
-const bloomChk=$('#bloom'); bloomChk.checked = localStorage.getItem('bloom')==='1';
-bloomChk.onchange=()=>{ saveSettings(); };
-
-const autoChk=$('#auto'); autoChk.checked = localStorage.getItem('auto')==='1';
-autoChk.onchange=()=>{ saveSettings(); };
-
-$('#hideBtn').onclick=()=>{ $('#ui').classList.add('hide'); $('#help').classList.add('hide'); };
-$('#fsBtn').onclick=()=>{ if(!document.fullscreenElement){ document.documentElement.requestFullscreen(); } else { document.exitFullscreen(); } };
-$('#shotBtn').onclick=snapshot;
-$('#pauseBtn').onclick=()=>{ running=!running; $('#pauseBtn').textContent=running?'Pause':'Play'; if(running) loop(performance.now()); };
-
-addEventListener('keydown',e=>{
-  if(e.code==='Space'){ e.preventDefault(); burst(); }
-  if(e.key==='c'||e.key==='C'){ nextPalette(); }
-  if(e.key==='p'||e.key==='P'){ $('#pauseBtn').click(); }
-  if(e.key==='m'||e.key==='M'){ $('#micBtn').click(); }
-  if(/[1-8]/.test(e.key)){ quality=+e.key; $('#quality').value=quality; saveSettings(); rebuildAll(); }
-  if(e.key==='f'||e.key==='F'){ $('#fsBtn').click(); }
-  if(e.key==='s'||e.key==='S'){ snapshot(); }
-  if(e.key==='b'||e.key==='B'){ bloomChk.checked=!bloomChk.checked; saveSettings(); }
-});
-
-paletteSel.onchange=e=>{ paletteIndex=+e.target.value; saveSettings(); };
-let autoTimer=0;
-function nextPalette(){ paletteIndex=(paletteIndex+1)%PALETTES.length; paletteSel.value=paletteIndex; saveSettings(); }
-function saveSettings(){
-  localStorage.setItem('palIdx',paletteIndex);
-  localStorage.setItem('qual',quality);
-  localStorage.setItem('scene',sceneSel.value);
-  localStorage.setItem('bloom', bloomChk.checked ? '1':'0');
-  localStorage.setItem('auto', autoChk.checked ? '1':'0');
-  localStorage.setItem('fps', $('#fps').value);
-}
-
-/* ========= Scenes data ========= */
-let particles=[], orbs=[], ribbons=[];
-function rebuildAll(){ buildFlow(); buildOrbs(); buildRibbons(); ctx.fillStyle='rgb(5,5,16)'; ctx.fillRect(0,0,W,H); }
-rebuildAll();
-
-/* Flowfield */
-let fieldScale=0.0016;
-function buildFlow(){
-  particles.length=0;
-  const count=Math.floor((W*H)/(1200/(quality*quality)));
-  for(let i=0;i<count;i++) particles.push({x:Math.random()*W,y:Math.random()*H,vx:0,vy:0,life:200+Math.random()*600,seed:Math.random()*6.28});
-}
-function field(x,y,t){
-  const n1=Simplex2D(x*fieldScale, y*fieldScale + t*0.35);
-  const n2=Simplex2D((x+1000)*fieldScale*0.6, (y-1000)*fieldScale*0.6 + t*0.22);
-  const a=(n1*1.15+n2*0.85)*Math.PI;
-  const m=0.6+0.4*Math.sin(n1*2.0 + t*0.5);
-  return {ax:Math.cos(a)*m, ay:Math.sin(a)*m};
-}
-function attract(p){
-  const dx=mouse.x-p.x, dy=mouse.y-p.y, d2=dx*dx+dy*dy; if(d2<1) return;
-  const k = Math.min(1/(d2*0.000002), 0.22); p.vx += dx*k; p.vy += dy*k;
-}
-
-/* Orbs */
-function buildOrbs(){
-  orbs.length=0;
-  const n = 24 + quality*6;
-  for(let i=0;i<n;i++){
-    orbs.push({x:Math.random()*W, y:Math.random()*H, r: 10+Math.random()*40*DPR, t:Math.random()*6.28, sp:0.003+Math.random()*0.004});
-  }
-}
-
-/* Ribbons */
-function buildRibbons(){
-  ribbons.length=0;
-  const bands = 6 + quality; // number of ribbons
-  for(let i=0;i<bands;i++){
-    const pts=[];
-    const len= 32 + quality*6;
-    const ox=Math.random()*W, oy=Math.random()*H, ang=Math.random()*Math.PI*2;
-    for(let j=0;j<len;j++){
-      pts.push({x:ox+Math.cos(ang)*j*8*DPR, y:oy+Math.sin(ang)*j*8*DPR, vx:0, vy:0});
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Yash Kumar Atri — atri.ac</title>
+  <meta name="description" content="Academic resume of Yash Kumar Atri, Postdoctoral Researcher at University of Virginia">
+  <style>
+    :root {
+      --fg: #111;
+      --bg: #fff;
+      --border: #ddd;
+      --link: #2563eb;
+      --mono: 'JetBrains Mono', monospace;
+      --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
     }
-    ribbons.push({pts, w: 8*DPR + Math.random()*10*DPR, seed: Math.random()*6.28, life: 1});
-  }
-}
-function evolveRibbon(rb, t, energy){
-  const sp = 0.6 + energy*1.4;
-  for(let i=0;i<rb.pts.length;i++){
-    const p=rb.pts[i];
-    const n = Simplex2D(p.x*0.0012 + t*0.4, p.y*0.0012 - t*0.3);
-    p.vx = Math.cos(n*3.1415)*sp; p.vy = Math.sin(n*3.1415)*sp;
-    if(mouse.down){
-      const dx=mouse.x-p.x, dy=mouse.y-p.y, d2=dx*dx+dy*dy;
-      const k=Math.min(1/(d2*0.000003), 0.25);
-      p.vx += dx*k; p.vy += dy*k;
-    }
-  }
-  // integrate and smooth along the band
-  for(let i=0;i<rb.pts.length;i++){
-    const p=rb.pts[i];
-    p.x+=p.vx; p.y+=p.vy;
-    if(p.x< -50||p.x>W+50||p.y< -50||p.y>H+50){ p.x=Math.random()*W; p.y=Math.random()*H; }
-    if(i>0){
-      const prev=rb.pts[i-1];
-      p.x = 0.7*p.x + 0.3*(prev.x + (p.vx)); // cohesion
-      p.y = 0.7*p.y + 0.3*(prev.y + (p.vy));
-    }
-  }
-}
-
-/* Snapshot */
-function snapshot(){
-  const a=document.createElement('a');
-  a.href=canvas.toDataURL('image/png'); a.download='atriac_'+Date.now()+'.png'; a.click();
-}
-
-/* Burst */
-function burst(ms=900){
-  for(const p of particles){
-    const dx=p.x-mouse.x, dy=p.y-mouse.y, d=Math.hypot(dx,dy)+0.0001;
-    const pow=7/(1+d*0.01); p.vx += (dx/d)*pow; p.vy += (dy/d)*pow;
-  }
-  for(const rb of ribbons){ for(const p of rb.pts){
-    const dx=p.x-mouse.x, dy=p.y-mouse.y, d=Math.hypot(dx,dy)+0.0001;
-    const pow=9/(1+d*0.01); p.vx += (dx/d)*pow; p.vy += (dy/d)*pow;
-  }}
-  const base=zInc; zInc=base*3; setTimeout(()=>zInc=base, ms);
-}
-
-/* Loop */
-let bgHue=210, hueTick=0;
-function loop(t){
-  if(!running) return;
-  requestAnimationFrame(loop);
-  if(t - lastFrame < frameCap) return;
-  lastFrame = t;
-
-  bgHue=(bgHue+0.25)%360; document.body.style.background=`hsl(${bgHue},40%,6%)`;
-  if(autoChk.checked && ++hueTick%900===0) { nextPalette(); if(hueTick%1800===0){ // swap scene sometimes
-      const idx = ['flow','orbs','ribbons']; const cur = sceneSel.value;
-      const next = idx[(idx.indexOf(cur)+1)%idx.length]; sceneSel.value=next; saveSettings(); rebuildAll();
-  }}
-
-  // audio energy
-  let energy=0;
-  if(micOn && analyser){ analyser.getByteFrequencyData(freqBuf);
-    for(let i=0;i<freqBuf.length;i++) energy += freqBuf[i];
-    energy /= (freqBuf.length*255);
-  }
-
-  const colorFn=PALETTES[paletteIndex].fn;
-  time += zInc + (energy||0)*0.01;
-
-  if(sceneSel.value==='flow'){
-    // trail fade
-    ctx.globalCompositeOperation='source-over';
-    const fade = 0.05 + (energy||0)*0.10;
-    ctx.fillStyle=`rgba(5,5,18,${fade})`; ctx.fillRect(0,0,W,H);
-
-    ctx.globalCompositeOperation='lighter';
-    for(let i=0;i<particles.length;i++){
-      const p=particles[i], v=field(p.x,p.y,time);
-      p.vx += v.ax*0.35; p.vy += v.ay*0.35;
-      if(mouse.down) attract(p);
-      p.vx*=0.965; p.vy*=0.965;
-
-      const nx=p.x+p.vx, ny=p.y+p.vy;
-      if(nx<0||nx>W||ny<0||ny>H){ p.x=Math.random()*W; p.y=Math.random()*H; p.vx=p.vy=0; p.life=200+Math.random()*600; continue; }
-
-      const tt = p.seed + time*1.6 + (energy||0)*3.0;
-      ctx.strokeStyle=colorFn(Math.sin(tt));
-      ctx.lineWidth= DPR * (0.55 + 0.75*Math.sin(tt*2.0));
-      ctx.beginPath(); ctx.moveTo(p.x,p.y); ctx.lineTo(nx,ny); ctx.stroke();
-
-      p.x=nx; p.y=ny; if(--p.life<=0){ p.x=Math.random()*W; p.y=Math.random()*H; p.vx=p.vy=0; p.life=200+Math.random()*600; }
-    }
-  } else if(sceneSel.value==='orbs'){
-    ctx.globalCompositeOperation='source-over';
-    const fade = 0.10; ctx.fillStyle=`rgba(5,5,18,${fade})`; ctx.fillRect(0,0,W,H);
-    ctx.globalCompositeOperation='lighter';
-
-    for(const o of orbs){
-      o.t += o.sp + (energy||0)*0.01;
-      const n = Simplex2D((o.x*0.0015)+(time*0.5), (o.y*0.0015)-(time*0.5));
-      o.x += Math.cos(o.t+n)*1.6*DPR; o.y += Math.sin(o.t-n)*1.6*DPR;
-
-      const dx=mouse.x-o.x, dy=mouse.y-o.y, d=Math.hypot(dx,dy);
-      if(mouse.down && d<200*DPR){ o.x -= dx*0.02; o.y -= dy*0.02; }
-
-      if(o.x< -50||o.x>W+50||o.y< -50||o.y>H+50){ o.x=Math.random()*W; o.y=Math.random()*H; }
-
-      const tt = o.t + time;
-      const r = o.r * (0.8 + 0.4*Math.sin(tt*2.0 + n));
-      const grad = ctx.createRadialGradient(o.x,o.y,0,o.x,o.y,r);
-      const col = colorFn(Math.sin(tt));
-      grad.addColorStop(0, col.replace(/0\.\d+\)/,'1)'));
-      grad.addColorStop(1, col);
-
-      ctx.fillStyle=grad;
-      ctx.beginPath(); ctx.arc(o.x,o.y,r,0,Math.PI*2); ctx.fill();
-    }
-  } else {
-    // ribbons
-    ctx.globalCompositeOperation='source-over';
-    const fade = 0.07 + (energy||0)*0.06;
-    ctx.fillStyle=`rgba(5,5,18,${fade})`; ctx.fillRect(0,0,W,H);
-
-    ctx.globalCompositeOperation='lighter';
-    for(const rb of ribbons){
-      evolveRibbon(rb, time, energy||0);
-      // draw strip
-      const w = rb.w*(0.9 + 0.3*Math.sin(time*1.3 + rb.seed));
-      ctx.lineJoin='round'; ctx.lineCap='round';
-      for(let i=1;i<rb.pts.length;i++){
-        const a=rb.pts[i-1], b=rb.pts[i];
-        const t = (i/rb.pts.length) + time*0.1 + rb.seed;
-        ctx.strokeStyle = colorFn(Math.sin(t*2.0));
-        ctx.lineWidth = w*(0.6 + 0.4*Math.sin(t*3.0));
-        ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --fg: #eaeaea;
+        --bg: #121212;
+        --border: #444;
+        --link: #60a5fa;
       }
     }
-  }
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: var(--sans);
+      background: var(--bg);
+      color: var(--fg);
+      line-height: 1.6;
+      padding: 2rem 1rem;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    h1 {
+      font-family: var(--mono);
+      font-size: 2.2rem;
+      font-weight: 600;
+      margin-bottom: 0.25rem;
+    }
+    .subtitle {
+      font-family: var(--mono);
+      font-size: 1.1rem;
+      color: #666;
+      margin-bottom: 1.5rem;
+    }
+    @media (prefers-color-scheme: dark) {
+      .subtitle { color: #aaa; }
+    }
+    h2 {
+      font-family: var(--mono);
+      font-size: 1.25rem;
+      margin: 1.5rem 0 0.75rem;
+      padding-bottom: 0.25rem;
+      border-bottom: 1px solid var(--border);
+    }
+    p, li {
+      margin-bottom: 0.6rem;
+    }
+    ul {
+      padding-left: 1.2rem;
+      margin-bottom: 1.2rem;
+    }
+    a {
+      color: var(--link);
+      text-decoration: none;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
+    .contact {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      margin: 1.5rem 0;
+      font-family: var(--mono);
+      font-size: 0.95rem;
+    }
+    .contact div {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .section {
+      margin-bottom: 2rem;
+    }
+    .job, .degree {
+      margin-bottom: 1.2rem;
+    }
+    .job-title, .degree-title {
+      font-weight: 600;
+      font-family: var(--mono);
+    }
+    .job-meta, .degree-meta {
+      font-family: var(--mono);
+      font-size: 0.95rem;
+      color: #555;
+    }
+    @media (prefers-color-scheme: dark) {
+      .job-meta, .degree-meta { color: #bbb; }
+    }
+    .venue-list {
+      columns: 2;
+      column-gap: 1.5rem;
+      font-family: var(--mono);
+      font-size: 0.95rem;
+    }
+    @media (max-width: 600px) {
+      .venue-list {
+        columns: 1;
+      }
+    }
+    footer {
+      margin-top: 2rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--border);
+      font-size: 0.9rem;
+      color: #777;
+    }
+    @media (prefers-color-scheme: dark) {
+      footer { color: #999; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Yash Kumar Atri</h1>
+    <div class="subtitle">Postdoctoral Researcher • University of Virginia</div>
+    
+    <div class="contact">
+      <div>📧 <a href="mailto:yash@atri.ac">yash@atri.ac</a></div>
+      <div>🌐 <a href="https://yashkumaratri.com">yashkumaratri.com</a></div>
+      <div>📍 Charlottesville, VA</div>
+    </div>
+  </header>
 
-  // bloom pass
-  if(bloomChk.checked){
-    // downsample
-    lctx.clearRect(0,0,low.width,low.height);
-    lctx.globalCompositeOperation='source-over';
-    lctx.filter='blur(6px) saturate(130%) brightness(120%)';
-    lctx.drawImage(canvas,0,0,low.width,low.height);
-    // upsample additively
-    ctx.globalCompositeOperation='lighter';
-    ctx.globalAlpha=0.6;
-    ctx.drawImage(low,0,0,W,H);
-    ctx.globalAlpha=1;
-    ctx.globalCompositeOperation='source-over';
-  }
-}
-requestAnimationFrame(loop);
+  <main>
+    <section class="section">
+      <p>
+        I am a postdoctoral researcher at the University of Virginia, working with 
+        <a href="https://www.tomhartvigsen.com">Prof. Tom Hartvigsen</a>. 
+        My research enables language models to continuously learn and adapt beyond pretraining, 
+        with a focus on <strong>model editing</strong> and <strong>continual learning</strong>. 
+        I completed my Ph.D. at IIIT Delhi under Prof. Vikram Goyal and Prof. Tanmoy Chakraborty.
+      </p>
+    </section>
 
-/* UI actions */
-function snapshot(){
-  const a=document.createElement('a');
-  a.href=canvas.toDataURL('image/png'); a.download='atriac_'+Date.now()+'.png'; a.click();
-}
+    <section class="section">
+      <h2>Education</h2>
+      <div class="degree">
+        <div class="degree-title">Ph.D. in Computer Science & Engineering</div>
+        <div class="degree-meta">IIIT Delhi, India • 2020–2024</div>
+        <p><strong>Advisors:</strong> Prof. Vikram Goyal, Prof. Tanmoy Chakraborty</p>
+        <p><strong>Thesis:</strong> Advancing Text Summarization with Conscience, Comprehension, and Multimodality</p>
+      </div>
+      <div class="degree">
+        <div class="degree-title">B.Tech. in Computer Science & Engineering</div>
+        <div class="degree-meta">Jaypee University, India • 2014–2018</div>
+        <p><strong>Advisor:</strong> Dr. Amit Kumar</p>
+        <p><strong>Thesis:</strong> Machine Translation in Indian Languages</p>
+      </div>
+    </section>
 
-/* Init */
-paletteIndex = +localStorage.getItem('palIdx') || paletteIndex;
-paletteSel.value=paletteIndex;
-document.body.style.background=`hsl(210,40%,6%)`;
-</script>
+    <section class="section">
+      <h2>Experience</h2>
+      <div class="job">
+        <div class="job-title">Postdoctoral Researcher</div>
+        <div class="job-meta">University of Virginia, USA • 2024–Present</div>
+        <p>Advised by Prof. Tom Hartvigsen. Research on lifelong model editing and continual learning for language models.</p>
+      </div>
+      <div class="job">
+        <div class="job-title">Research Associate</div>
+        <div class="job-meta">LCS², IIIT Delhi • 2019</div>
+      </div>
+      <div class="job">
+        <div class="job-title">Software Engineer (Data Science)</div>
+        <div class="job-meta">Lumiq.ai, Noida • 2018–2019</div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Awards</h2>
+      <ul>
+        <li><strong>DAAD AInet Fellow 2024</strong> – Postdoc-NET-AI, Germany</li>
+        <li>Travel Grants – Microsoft, iHub-Anubhuti, ACM-India (EMNLP 2023, KDD 2023)</li>
+      </ul>
+    </section>
+
+    <section class="section">
+      <h2>Professional Service</h2>
+      <h3>Reviewing</h3>
+      <div class="venue-list">
+        <span>• ACL Rolling Review (ARR) 2025 (Area Chair)</span>
+        <span>• ICLR 2025</span>
+        <span>• ICLR 2024</span>
+        <span>• TCSS 2025</span>
+        <span>• TCSS 2024</span>
+        <span>• TASL 2024</span>
+        <span>• Knowledge-Based Systems (KBS) 2024</span>
+        <span>• ASONAM 2024</span>
+        <span>• ICON 2024</span>
+        <span>• BDA 2023</span>
+        <span>• EMNLP 2023</span>
+        <span>• ACL 2023</span>
+      </div>
+
+      <h3>Organizing</h3>
+      <ul>
+        <li>Organizer: BDA 2023, ICON 2023</li>
+        <li>Workshop Chair: ACSS (2020–2022), COFAD 2020</li>
+      </ul>
+
+      <h3>Teaching</h3>
+      <ul>
+        <li>Teaching Assistant: CSE557 (W2020, W2021), CSE506 (S2020, S2021) — IIIT Delhi</li>
+        <li>Guest Lecturer: Tutorial on AI-Driven Mental Health Counseling — ICON 2023</li>
+      </ul>
+    </section>
+  </main>
+
+  <footer>
+    <p>© 2025 Yash Kumar Atri • <a href="https://yashkumaratri.com">Full portfolio</a> • <a href="/ambient">Ambient Mode</a></p>
+  </footer>
 </body>
 </html>
