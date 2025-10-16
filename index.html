@@ -3,60 +3,46 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Yash Kumar Atri — atri.ac</title>
-  <meta name="description" content="Academic resume of Yash Kumar Atri, Postdoctoral Researcher at University of Virginia">
+  <title>Yash Kumar Atri</title>
+  <meta name="description" content="Yash Kumar Atri, Postdoctoral Researcher at University of Virginia">
   <style>
-    :root {
-      --fg: #111;
-      --bg: #fff;
-      --border: #ddd;
-      --link: #2563eb;
-      --mono: 'JetBrains Mono', monospace;
-      --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
-    }
-    @media (prefers-color-scheme: dark) {
-      :root {
-        --fg: #eaeaea;
-        --bg: #121212;
-        --border: #444;
-        --link: #60a5fa;
-      }
-    }
     * {
       margin: 0;
       padding: 0;
       box-sizing: border-box;
     }
     body {
-      font-family: var(--sans);
-      background: var(--bg);
-      color: var(--fg);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+      background: #fff;
+      color: #111;
       line-height: 1.6;
       padding: 2rem 1rem;
       max-width: 800px;
       margin: 0 auto;
     }
     h1 {
-      font-family: var(--mono);
+      font-family: 'JetBrains Mono', monospace;
       font-size: 2.2rem;
       font-weight: 600;
       margin-bottom: 0.25rem;
     }
     .subtitle {
-      font-family: var(--mono);
+      font-family: 'JetBrains Mono', monospace;
       font-size: 1.1rem;
-      color: #666;
+      color: #555;
       margin-bottom: 1.5rem;
     }
-    @media (prefers-color-scheme: dark) {
-      .subtitle { color: #aaa; }
-    }
     h2 {
-      font-family: var(--mono);
+      font-family: 'JetBrains Mono', monospace;
       font-size: 1.25rem;
       margin: 1.5rem 0 0.75rem;
       padding-bottom: 0.25rem;
-      border-bottom: 1px solid var(--border);
+      border-bottom: 1px solid #ddd;
+    }
+    h3 {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 1.1rem;
+      margin: 1.2rem 0 0.6rem;
     }
     p, li {
       margin-bottom: 0.6rem;
@@ -66,7 +52,7 @@
       margin-bottom: 1.2rem;
     }
     a {
-      color: var(--link);
+      color: #2563eb;
       text-decoration: none;
     }
     a:hover {
@@ -77,7 +63,7 @@
       flex-wrap: wrap;
       gap: 1rem;
       margin: 1.5rem 0;
-      font-family: var(--mono);
+      font-family: 'JetBrains Mono', monospace;
       font-size: 0.95rem;
     }
     .contact div {
@@ -93,36 +79,45 @@
     }
     .job-title, .degree-title {
       font-weight: 600;
-      font-family: var(--mono);
+      font-family: 'JetBrains Mono', monospace;
     }
     .job-meta, .degree-meta {
-      font-family: var(--mono);
+      font-family: 'JetBrains Mono', monospace;
       font-size: 0.95rem;
       color: #555;
     }
-    @media (prefers-color-scheme: dark) {
-      .job-meta, .degree-meta { color: #bbb; }
-    }
-    .venue-list {
-      columns: 2;
-      column-gap: 1.5rem;
-      font-family: var(--mono);
+    .pub-list {
+      list-style: none;
+      padding: 0;
+      margin-bottom: 1.2rem;
       font-size: 0.95rem;
+      line-height: 1.6;
     }
-    @media (max-width: 600px) {
-      .venue-list {
-        columns: 1;
-      }
+    .pub-list li {
+      margin-bottom: 0.8rem;
     }
+    .venue {
+      font-family: 'JetBrains Mono', monospace;
+      color: #555;
+    }
+    .pub-note {
+      font-size: 0.9rem;
+      color: #666;
+    }
+    .pub-note a {
+      color: #2563eb;
+      text-decoration: none;
+    }
+    .pub-note a:hover {
+      text-decoration: underline;
+    }
+    
     footer {
       margin-top: 2rem;
       padding-top: 1.5rem;
-      border-top: 1px solid var(--border);
+      border-top: 1px solid #ddd;
       font-size: 0.9rem;
-      color: #777;
-    }
-    @media (prefers-color-scheme: dark) {
-      footer { color: #999; }
+      color: #666;
     }
   </style>
 </head>
@@ -132,23 +127,49 @@
     <div class="subtitle">Postdoctoral Researcher • University of Virginia</div>
     
     <div class="contact">
-      <div>📧 <a href="mailto:yash@atri.ac">yash@atri.ac</a></div>
+      <div>📧 <a href="mailto:atri@virginia.edu">atri@virginia.edu</a></div>
       <div>🌐 <a href="https://yashkumaratri.com">yashkumaratri.com</a></div>
       <div>📍 Charlottesville, VA</div>
     </div>
   </header>
 
   <main>
-    <section class="section">
-      <p>
-        I am a postdoctoral researcher at the University of Virginia, working with 
-        <a href="https://www.tomhartvigsen.com">Prof. Tom Hartvigsen</a>. 
-        My research enables language models to continuously learn and adapt beyond pretraining, 
-        with a focus on <strong>model editing</strong> and <strong>continual learning</strong>. 
-        I completed my Ph.D. at IIIT Delhi under Prof. Vikram Goyal and Prof. Tanmoy Chakraborty.
-      </p>
-    </section>
+<section class="section">
+  <p>
+    I am a postdoctoral researcher at the University of Virginia, working with 
+    <a href="https://www.tomhartvigsen.com">Prof. Tom Hartvigsen</a>.
+  </p>
+  <p>
+    My research focuses on enabling language models to learn continuously and adapt beyond their initial pretraining. 
+    I develop methods in <strong>model editing</strong> and <strong>continual learning</strong> that allow models to 
+    incorporate new knowledge, correct errors, and evolve over time—without forgetting what they already know.
+  </p>
+  <p>
+    I earned my Ph.D. in Computer Science and Engineering from IIIT Delhi, where I was advised by 
+    Prof. Vikram Goyal and Prof. Tanmoy Chakraborty.
+  </p>
+</section>
 
+    <section class="section">
+  <h2>Publications</h2>
+  <ul class="pub-list">
+    <li><strong>Lifelong Model Editing with Graph-Based External Memory</strong> — Yash Kumar Atri, Ahmed Alaa, Thomas Hartvigsen — <span class="venue">ACL Findings 2025</span></li>
+    <li><strong>Continually Self-Improving Language Models for Bariatric Surgery Question–Answering</strong> — Yash Kumar Atri, Thomas H. Shin, Thomas Hartvigsen — <span class="venue">Preprint 2025</span></li>
+    <li><strong>Promoting Topic Coherence and Inter-Document Consorts in Multi-Document Summarization via Simplicial Complex and Sheaf Graph</strong> — Yash Kumar Atri, Arun Iyer, Tanmoy Chakraborty, Vikram Goyal — <span class="venue">EMNLP (Main) 2023</span></li>
+    <li><strong>Fusing Multimodal Signals on Hyper-Complex Space for Extreme Abstractive Text Summarization</strong> — Yash Kumar Atri, Tanmoy Chakraborty, Vikram Goyal — <span class="venue">SIGKDD 2023</span></li>
+    <li><strong>System and Method for Text Summarization</strong> — Simran Kalra, Yash Kumar Atri, Tanmoy Chakraborty — <span class="venue">Patent (2024)</span></li>
+    <li><strong>Exploiting Representation Bias for Data Distillation in Abstractive Text Summarization</strong> — Yash Kumar Atri, Tanmoy Chakraborty, Vikram Goyal — <span class="venue">Preprint 2023</span></li>
+    <li><strong>Multi-Document Summarization Using Selective Attention Span and Reinforcement Learning</strong> — Yash Kumar Atri, Tanmoy Chakraborty, Vikram Goyal — <span class="venue">TASL 2023</span></li>
+    <li><strong>Inline Citation Classification Using Peripheral Context and Time-Evolving Augmentation</strong> — Priyanshi Gupta, Yash Kumar Atri, Apurva Nagvenkar, Sourish Dasgupta, Tanmoy Chakraborty — <span class="venue">PAKDD 2023</span></li>
+    <li><strong>See, Hear, Read: Leveraging Multimodality with Guided Attention for Abstractive Text Summarization</strong> — Yash Kumar Atri, Shraman Pramanick, Vikram Goyal, Tanmoy Chakraborty — <span class="venue">KBS 2021</span></li>
+    <li><strong>Assessing the Quality of the Datasets by Identifying Mislabeled Samples</strong> — Vaibhav Pulastya, Gaurav Nuti, Yash Kumar Atri, Tanmoy Chakraborty — <span class="venue">ASONAM 2021</span></li>
+    <li><strong>Corpora Evaluation and System Bias Detection in Multi-Document Summarization</strong> — Alvin Dey, Tanya Chowdhury, Yash Kumar Atri, Tanmoy Chakraborty — <span class="venue">EMNLP Findings 2020</span></li>
+  </ul>
+  <p class="pub-note">
+    <a href="https://scholar.google.com/citations?user=sTyStXIAAAAJ&hl=en">Google Scholar</a>
+  </p>
+</section>
+    
     <section class="section">
       <h2>Education</h2>
       <div class="degree">
@@ -170,11 +191,12 @@
       <div class="job">
         <div class="job-title">Postdoctoral Researcher</div>
         <div class="job-meta">University of Virginia, USA • 2024–Present</div>
-        <p>Advised by Prof. Tom Hartvigsen. Research on lifelong model editing and continual learning for language models.</p>
+        <p>Advised by Prof. Tom Hartvigsen.</p>
+        <p>Research on lifelong model editing and continual learning for language models.</p>
       </div>
       <div class="job">
         <div class="job-title">Research Associate</div>
-        <div class="job-meta">LCS², IIIT Delhi • 2019</div>
+        <div class="job-meta">LCS2, IIIT Delhi • 2019</div>
       </div>
       <div class="job">
         <div class="job-title">Software Engineer (Data Science)</div>
@@ -193,20 +215,12 @@
     <section class="section">
       <h2>Professional Service</h2>
       <h3>Reviewing</h3>
-      <div class="venue-list">
-        <span>• ACL Rolling Review (ARR) 2025 (Area Chair)</span>
-        <span>• ICLR 2025</span>
-        <span>• ICLR 2024</span>
-        <span>• TCSS 2025</span>
-        <span>• TCSS 2024</span>
-        <span>• TASL 2024</span>
-        <span>• Knowledge-Based Systems (KBS) 2024</span>
-        <span>• ASONAM 2024</span>
-        <span>• ICON 2024</span>
-        <span>• BDA 2023</span>
-        <span>• EMNLP 2023</span>
-        <span>• ACL 2023</span>
-      </div>
+      <p>
+        Area Chair, ARR 2025; 
+        Reviewer for ICLR 25,24; ARR 25,24; TCSS 25,24; TASL 24; 
+        Knowledge-Based Systems (KBS) 2024; ASONAM 2024; ICON 25,24; BDA 24,23; 
+        EMNLP 23; ACL 23.
+      </p>
 
       <h3>Organizing</h3>
       <ul>
